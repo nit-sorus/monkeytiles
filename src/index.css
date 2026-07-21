@@ -79,13 +79,13 @@ p {
   line-height: 1.5;
 }
 
-/* UI Layout Containers */
+/* UI Layout Containers - 0.5x Opaque Glass Panels */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.45);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  border: 1.5px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 4px 20px rgba(11, 20, 26, 0.06);
+  border: 1.5px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   border-radius: 16px;
   transition: all 0.2s ease;
 }
@@ -172,28 +172,26 @@ p {
 
 /* Front side (Unflipped) - Translucent glass merging with WhatsApp doodle wallpaper */
 .tile-front {
-  background: rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.45);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
-  border: 1.5px solid rgba(0, 168, 132, 0.35);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border: 1.5px solid rgba(0, 168, 132, 0.4);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .tile-card:hover .tile-front {
-  background: rgba(0, 168, 132, 0.2);
+  background: rgba(0, 168, 132, 0.25);
   border-color: var(--accent-primary);
-  box-shadow: 0 4px 12px rgba(0, 168, 132, 0.18);
+  box-shadow: 0 4px 12px rgba(0, 168, 132, 0.25);
 }
 
-/* "MT" watermark on unflipped tile front */
+/* Monkey logo watermark on unflipped tile front */
 .tile-watermark {
-  font-family: var(--font-heading);
-  font-size: 1.15rem;
-  font-weight: 800;
-  color: rgba(0, 168, 132, 0.45);
-  letter-spacing: 0.08em;
+  font-size: 1.8rem;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
   pointer-events: none;
   user-select: none;
+  opacity: 0.75;
 }
 
 /* Back side (Flipped / Showing Symbol) */

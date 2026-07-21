@@ -391,11 +391,11 @@ function App() {
 
   return (
     <>
-      {/* Header — Enclosed in High Contrast Badge Container */}
-      <header style={{ margin: '16px auto 24px', width: '90%', maxWidth: '1200px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-        <div className="header-title-box">
-          <span style={{ fontSize: '2.8rem', filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.12))' }}>🐵</span>
-          <h1 style={{ fontSize: '2.0rem', margin: 0, fontWeight: 800, textTransform: 'lowercase', letterSpacing: '0.25em', color: 'var(--accent-primary)' }}>
+      {/* Header */}
+      <header style={{ margin: '16px auto 24px', width: '90%', maxWidth: '1200px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ fontSize: '3.0rem', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.4))' }}>🐵</span>
+          <h1 style={{ fontSize: '2.0rem', margin: 0, fontWeight: 800, textTransform: 'lowercase', letterSpacing: '0.25em', color: '#ffffff', textShadow: '0 2px 8px rgba(0,0,0,0.6)' }}>
             monkeytiles
           </h1>
         </div>
@@ -673,7 +673,7 @@ function App() {
                       >
                         <div className="tile-inner">
                           <div className="tile-face tile-front">
-                            {!isVisible && <span className="tile-watermark">MT</span>}
+                            {!isVisible && <span className="tile-watermark">🐵</span>}
                           </div>
                           <div className="tile-face tile-back">
                             {isVisible ? card.symbol : ''}
@@ -699,7 +699,7 @@ function App() {
                       >
                         <div className="tile-inner">
                           <div className="tile-face tile-front">
-                            {!isVisible && <span className="tile-watermark">MT</span>}
+                            {!isVisible && <span className="tile-watermark">🐵</span>}
                           </div>
                           <div className="tile-face tile-back">
                             {isVisible ? card.symbol : ''}
