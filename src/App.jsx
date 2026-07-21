@@ -457,7 +457,7 @@ function App() {
               {/* Card Deck Selector */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Layers size={16} /> Deck Theme:
+                  <Layers size={16} /> Card Deck:
                 </span>
                 <select 
                   className="input-field" 
