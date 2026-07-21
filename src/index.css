@@ -1,0 +1,361 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+  /* Design Tokens */
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-heading: 'Outfit', var(--font-sans);
+  
+  /* Color Palette - WhatsApp Muted Theme */
+  --bg-primary: #f0f2f5;
+  --bg-card: rgba(255, 255, 255, 0.95);
+  --border-color: rgba(0, 0, 0, 0.08);
+  --text-primary: #111b21;
+  --text-secondary: #3b4a54;
+  --text-muted: #667781;
+  
+  --accent-primary: #00a884; /* WhatsApp Green */
+  --accent-secondary: #ea4c89; /* Rose/Pink */
+  --accent-success: #1fa855;
+  --accent-danger: #ea0038;
+  --accent-warning: #e07b00;
+  
+  --shadow-sm: 0 1px 2px rgba(11, 20, 26, 0.08);
+  --shadow-md: 0 4px 12px rgba(11, 20, 26, 0.08);
+  
+  --glass-bg: rgba(255, 255, 255, 0.92);
+  --glass-border: rgba(255, 255, 255, 0.5);
+  --glass-shadow: 0 2px 8px rgba(11, 20, 26, 0.05);
+}
+
+/* Force light theme always — no dark mode overrides */
+
+/* Base resets & document settings */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+}
+
+body {
+  background-color: var(--bg-primary);
+  background-image: url('/whatsapp-bg.jpg');
+  background-repeat: repeat;
+  background-size: auto;
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  position: relative;
+}
+
+/* Light theme only — background stays consistent on all devices */
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+/* Typography settings */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--text-primary);
+}
+
+p {
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* UI Layout Containers */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 4px 16px rgba(11, 20, 26, 0.05);
+  border-radius: 14px;
+  transition: all 0.2s ease;
+}
+
+/* Game Layout Grid Column Split */
+.game-container {
+  display: grid;
+  grid-template-columns: 0.85fr 1.15fr; /* 42.5% left (controls), 57.5% right (grid) */
+  gap: 28px;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .game-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Card Grid Styles */
+.game-grid {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* Resized grids (0.8x of 1.5x) to fit beautifully on a single screen */
+.grid-4 {
+  grid-template-columns: repeat(4, 1fr);
+  max-width: 380px;
+}
+.grid-6 {
+  grid-template-columns: repeat(6, 1fr);
+  max-width: 530px;
+}
+.grid-8 {
+  grid-template-columns: repeat(8, 1fr);
+  max-width: 690px;
+}
+
+/* 3D Tile Card Styles - Translucent Glass Boxes that Merge with Background */
+.tile-card {
+  aspect-ratio: 1;
+  perspective: 600px;
+  cursor: pointer;
+  position: relative;
+  border-radius: 8px;
+}
+
+.tile-inner {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  text-align: center;
+  transition: transform 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
+  transform-style: preserve-3d;
+  border-radius: inherit;
+}
+
+.tile-card.flipped .tile-inner {
+  transform: rotateY(180deg);
+}
+
+.tile-card.matched .tile-inner {
+  transform: rotateY(180deg);
+  pointer-events: none;
+}
+
+.tile-face {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+/* Front side (Unflipped) - Translucent glass merging with WhatsApp doodle wallpaper */
+.tile-front {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  border: 1.5px solid rgba(0, 168, 132, 0.3);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.tile-card:hover .tile-front {
+  background: rgba(0, 168, 132, 0.18);
+  border-color: var(--accent-primary);
+  box-shadow: 0 4px 12px rgba(0, 168, 132, 0.15);
+}
+
+/* Back side (Flipped / Showing Symbol) */
+.tile-back {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(4px);
+  border: 2px solid var(--accent-primary);
+  box-shadow: 0 4px 14px rgba(0, 168, 132, 0.2);
+  transform: rotateY(180deg);
+  font-size: 3.2rem;
+  user-select: none;
+  position: relative;
+}
+
+/* "MT" watermark on empty tile back (before it's flipped) */
+.tile-back-watermark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-heading);
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: rgba(0, 168, 132, 0.22);
+  letter-spacing: 0.05em;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Main Buttons styling */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--accent-primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+}
+
+.btn-primary:active {
+  transform: scale(0.98);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.btn-secondary:hover {
+  background: rgba(0, 168, 132, 0.05);
+  border-color: var(--accent-primary);
+}
+
+.btn-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: color 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 6px;
+}
+
+.btn-icon:hover {
+  color: var(--accent-primary);
+}
+
+/* Lobby inputs */
+.input-field {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  transition: border-color 0.15s ease;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+/* Grid size pill toggle */
+.grid-toggle-bar {
+  display: inline-flex;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.grid-toggle-btn {
+  border: none;
+  background: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all 0.15s ease;
+}
+
+.grid-toggle-btn.active {
+  background: #ffffff;
+  color: var(--accent-primary);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+
+/* Status Alert Badge */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.status-badge.active {
+  background: rgba(0, 168, 132, 0.1);
+  color: var(--accent-primary);
+}
+
+.status-badge.waiting {
+  background: rgba(224, 123, 0, 0.1);
+  color: var(--accent-warning);
+}
+
+/* Header & footer components */
+header {
+  padding: 12px 0;
+}
+
+footer {
+  margin-top: auto;
+  padding: 12px 0;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Pulse heart animation */
+@keyframes heartBeat {
+  0% { transform: scale(1); }
+  14% { transform: scale(1.12); }
+  28% { transform: scale(1); }
+  42% { transform: scale(1.12); }
+  70% { transform: scale(1); }
+}
