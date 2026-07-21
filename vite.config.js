@@ -5,4 +5,13 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   base: './',
+  build: {
+    rollupOptions: {
+      output: {
+        entryFileNames: `assets/[name]-v1-7-${Date.now()}.js`,
+        chunkFileNames: `assets/[name]-v1-7-${Date.now()}.js`,
+        assetFileNames: `assets/[name]-v1-7-${Date.now()}[extname]`
+      }
+    }
+  }
 })
