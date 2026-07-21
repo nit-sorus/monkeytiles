@@ -391,23 +391,13 @@ function App() {
 
   return (
     <>
-      {/* Header — monkeytiles on left, Parallel How to Play card on right */}
-      <header style={{ margin: '16px auto 24px', width: '90%', maxWidth: '1200px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+      {/* Header */}
+      <header style={{ margin: '16px auto 24px', width: '90%', maxWidth: '1200px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <span style={{ fontSize: '3.0rem', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.4))' }}>🐵</span>
           <h1 style={{ fontSize: '2.0rem', margin: 0, fontWeight: 800, textTransform: 'lowercase', letterSpacing: '0.25em', color: '#ffffff', textShadow: '0 2px 8px rgba(0,0,0,0.6)' }}>
             monkeytiles
           </h1>
-        </div>
-
-        {/* Parallel Crisp How to Play Card */}
-        <div className="rules-card" style={{ maxWidth: '520px', flex: 1 }}>
-          <h3>
-            <BookOpen size={18} style={{ color: 'var(--accent-primary)' }} /> How to Play
-          </h3>
-          <p>
-            Flip 2 cards at a time to find matching pairs. Each match earns <strong style={{ color: 'var(--accent-primary)' }}>+10 pts</strong>! Mismatches cost <strong style={{ color: 'var(--accent-danger)' }}>-5 pts</strong> and flip back.
-          </p>
         </div>
       </header>
 
@@ -428,8 +418,6 @@ function App() {
                 {[
                   { key: 'solo', label: '🎮 Play Solo' },
                   { key: 'friend', label: '👥 With Friend' },
-                  { key: 'local', label: '🎲 Pass & Play' },
-                  { key: 'daily', label: '📅 "Your People"' },
                 ].map(({ key, label }) => (
                   <button
                     key={key}
@@ -635,8 +623,8 @@ function App() {
               </div>
             )}
 
-            {/* Solo / Daily Net Score Card */}
-            {(gameMode === 'solo' || gameMode === 'daily') && (
+            {/* Solo Net Score Card */}
+            {gameMode === 'solo' && (
               <div className="glass-panel" style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -652,6 +640,16 @@ function App() {
                 </div>
               </div>
             )}
+
+            {/* Rules */}
+            <div className="glass-panel" style={{ padding: '16px' }}>
+              <h3 style={{ fontSize: '0.95rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-primary)', margin: '0 0 8px', fontWeight: 800 }}>
+                <BookOpen size={16} style={{ color: 'var(--accent-primary)' }} /> How to Play
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.5', margin: 0 }}>
+                Flip 2 cards at a time to find matching pairs. Each match earns <strong style={{ color: 'var(--accent-primary)' }}>+10 pts</strong>! Mismatches cost <strong style={{ color: 'var(--accent-danger)' }}>-5 pts</strong> and flip back.
+              </p>
+            </div>
 
 
 
