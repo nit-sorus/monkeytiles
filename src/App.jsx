@@ -12,9 +12,7 @@ import {
 
 const SOCKET_URL = import.meta.env.DEV 
   ? 'http://localhost:3001' 
-  : (window.location.hostname.includes('github.io') || window.location.hostname.includes('js.org'))
-    ? 'https://your-backend.onrender.com'
-    : window.location.origin;
+  : 'https://monkeytiles.onrender.com';
 
 const CARD_DECKS = {
   animals: {
