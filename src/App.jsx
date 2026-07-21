@@ -7,7 +7,8 @@ import {
   RefreshCw, 
   Share2, 
   BookOpen,
-  Layers
+  Layers,
+  LogOut
 } from 'lucide-react';
 
 const SOCKET_URL = import.meta.env.DEV 
@@ -36,13 +37,49 @@ const CARD_DECKS = {
   fun: {
     name: 'Sports & Fun ⚽',
     symbols: [
-      '⚽', '🏀', '🏈', '⚾', '🎾', '🏐', '🎱', '🎯', 
+      '⚽', '🏀', '🏈', '⚾', '<ctrl42>', '🏐', '🎱', '🎯', 
       '🎨', '🎸', '🎧', '🚀', '⛵', '🛸', '🚗', '🎮', 
       '🎲', '♟️', '🎪', '🎭', '🎟️', '🏆', '🥇', '🎁', 
       '🎈', '🎉', '⚡', '🔥', '🌈', '⭐', '💎', '🔮'
     ]
   }
 };
+
+// Web Audio API synthesized match chime (works cross-browser without external assets)
+function playMatchSound() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const now = ctx.currentTime;
+    
+    // Note 1: E5 (659.25Hz)
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(659.25, now);
+    gain1.gain.setValueAtTime(0.15, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.3);
+
+    // Note 2: A5 (880Hz)
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(880, now + 0.1);
+    gain2.gain.setValueAtTime(0.2, now + 0.1);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.1);
+    osc2.stop(now + 0.45);
+  } catch (e) {
+    // Silently ignore browser audio policy restrictions
+  }
+}
 
 // Seeded random number generator for Daily Board
 function seededRandom(seed) {
@@ -118,27 +155,23 @@ function App() {
   const [errorMsg, setErrorMsg] = useState('');
   const [copied, setCopied] = useState(false);
 
-  // Initialize Local Boards (Solo, Daily, Local Pass & Play)
+  // Initialize Boards for all modes (including placeholder board for Friend lobby)
   useEffect(() => {
-    if (gameMode === 'solo' || gameMode === 'local') {
-      setSoloBoard(generateLocalBoard(gridSize, selectedDeck));
-      setSoloFlipped([]);
-      setWastedTurns(0);
-      setSoloIsWaiting(false);
-      setSoloWinner(false);
-      setLocalP1Score(0);
-      setLocalP2Score(0);
-      setLocalActivePlayer(1);
-      setLocalWinner(null);
-    } else if (gameMode === 'daily') {
+    if (gameMode === 'daily') {
       const today = new Date();
       const dateSeed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
       setSoloBoard(generateSeededBoard(gridSize, dateSeed, selectedDeck));
-      setSoloFlipped([]);
-      setWastedTurns(0);
-      setSoloIsWaiting(false);
-      setSoloWinner(false);
+    } else {
+      setSoloBoard(generateLocalBoard(gridSize, selectedDeck));
     }
+    setSoloFlipped([]);
+    setWastedTurns(0);
+    setSoloIsWaiting(false);
+    setSoloWinner(false);
+    setLocalP1Score(0);
+    setLocalP2Score(0);
+    setLocalActivePlayer(1);
+    setLocalWinner(null);
   }, [gameMode, gridSize, selectedDeck]);
 
   // Parse room from URL query on load
@@ -152,7 +185,6 @@ function App() {
   }, []);
 
   // Socket setup for online multiplayer
-  // Server is the SINGLE SOURCE OF TRUTH — all updates come only from 'game-state' events
   useEffect(() => {
     if (gameMode !== 'friend') {
       if (socket) {
@@ -163,7 +195,7 @@ function App() {
     }
 
     const newSocket = io(SOCKET_URL, {
-      transports: ['websocket'], // skip polling, connect faster
+      transports: ['websocket'],
       reconnectionAttempts: 5
     });
     setSocket(newSocket);
@@ -175,9 +207,18 @@ function App() {
       window.history.pushState({ path: newUrl }, '', newUrl);
     });
 
-    // *** ALL board state comes from here — no card-flipped/card-flipped-back events ***
     newSocket.on('game-state', (state) => {
-      setGameState(state);
+      setGameState(prev => {
+        // Trigger sound if a new match was made on server
+        if (prev && state && state.board) {
+          const prevMatches = prev.board.filter(c => c.isMatched).length;
+          const newMatches = state.board.filter(c => c.isMatched).length;
+          if (newMatches > prevMatches) {
+            playMatchSound();
+          }
+        }
+        return state;
+      });
       if (state.gridSize) setGridSize(state.gridSize);
       setErrorMsg('');
     });
@@ -203,7 +244,6 @@ function App() {
     const clickedCard = soloBoard[cardIndex];
     if (clickedCard.isFlipped || clickedCard.isMatched) return;
 
-    // Deep clone the board to avoid mutation bugs
     const updatedBoard = soloBoard.map((c, i) => i === cardIndex ? { ...c, isFlipped: true } : { ...c });
     setSoloBoard(updatedBoard);
 
@@ -216,7 +256,8 @@ function App() {
       const secondCard = updatedBoard[secondIndex];
 
       if (firstCard.symbol === secondCard.symbol) {
-        // MATCH
+        // MATCH FOUND
+        playMatchSound();
         const matchedBoard = updatedBoard.map((c, i) =>
           i === firstIndex || i === secondIndex ? { ...c, isMatched: true } : c
         );
@@ -262,7 +303,7 @@ function App() {
     }
   };
 
-  // Online Multiplayer Tile Click — just emit the intent; server sends back full state
+  // Online Multiplayer Tile Click — Optimistic local flip for 0ms instant response!
   const handleCardClick = (cardIndex) => {
     if (!socket || !gameState || gameState.isWaiting || gameState.winner) return;
     
@@ -273,7 +314,15 @@ function App() {
     const card = gameState.board[cardIndex];
     if (!card || card.isFlipped || card.isMatched) return;
 
-    // Do NOT update state locally — wait for server's game-state event
+    // Instant local flip (0ms latency UI update)
+    setGameState(prev => {
+      if (!prev) return prev;
+      const updatedBoard = prev.board.map((c, idx) => 
+        idx === cardIndex ? { ...c, isFlipped: true } : c
+      );
+      return { ...prev, board: updatedBoard };
+    });
+
     socket.emit('flip-card', cardIndex);
   };
 
@@ -287,6 +336,7 @@ function App() {
 
   const handleCreateRoom = () => {
     if (!socket) return;
+    setGameState(null);
     socket.emit('create-room', { playerName, gridSize });
   };
 
@@ -335,13 +385,17 @@ function App() {
   const isMyTurn = gameState && socket && !gameState.winner &&
     gameState.players[gameState.activePlayerIndex]?.id === socket.id;
 
+  // Calculate Net Score for Solo / Daily mode
+  const matchedPairsCount = Math.floor(soloBoard.filter(c => c.isMatched).length / 2);
+  const netScore = Math.max(0, (matchedPairsCount * 10) - (wastedTurns * 5));
+
   return (
     <>
-      {/* Header */}
-      <header style={{ margin: '16px auto 24px', width: '90%', maxWidth: '1200px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ fontSize: '3.0rem', filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.12))' }}>🐵</span>
-          <h1 style={{ fontSize: '2.0rem', margin: 0, fontWeight: 800, textTransform: 'lowercase', letterSpacing: '0.25em', color: 'var(--text-primary)' }}>
+      {/* Header — Enclosed in High Contrast Badge Container */}
+      <header style={{ margin: '16px auto 24px', width: '90%', maxWidth: '1200px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <div className="header-title-box">
+          <span style={{ fontSize: '2.8rem', filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.12))' }}>🐵</span>
+          <h1 style={{ fontSize: '2.0rem', margin: 0, fontWeight: 800, textTransform: 'lowercase', letterSpacing: '0.25em', color: 'var(--accent-primary)' }}>
             monkeytiles
           </h1>
         </div>
@@ -355,12 +409,12 @@ function App() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
             
             {/* Game Modes Panel */}
-            <div className="glass-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <h2 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
-                <Gamepad2 size={16} style={{ color: 'var(--accent-primary)' }} /> Select Game Mode
+            <div className="glass-panel" style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <h2 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                <Gamepad2 size={18} style={{ color: 'var(--accent-primary)' }} /> Select Game Mode
               </h2>
               
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 {[
                   { key: 'solo', label: '🎮 Play Solo' },
                   { key: 'friend', label: '👥 With Friend' },
@@ -372,12 +426,10 @@ function App() {
                     className={`btn-secondary${gameMode === key ? ' active' : ''}`}
                     onClick={() => setGameMode(key)}
                     style={{
-                      padding: '10px 8px',
-                      fontSize: '0.8rem',
+                      padding: '12px 10px',
+                      fontSize: '0.92rem',
                       justifyContent: 'center',
-                      background: gameMode === key ? 'rgba(0,168,132,0.15)' : 'rgba(255,255,255,0.5)',
-                      border: `1.5px solid ${gameMode === key ? 'var(--accent-primary)' : 'rgba(0,0,0,0.08)'}`,
-                      fontWeight: gameMode === key ? 700 : 500
+                      fontWeight: 700
                     }}
                   >
                     {label}
@@ -386,8 +438,8 @@ function App() {
               </div>
 
               {/* Grid Size Selector */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px', borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '10px' }}>
-                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>Grid:</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', borderTop: '1px solid rgba(0,0,0,0.08)', paddingTop: '12px' }}>
+                <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Grid Size:</span>
                 <div className="grid-toggle-bar">
                   {[4, 6, 8].map(size => (
                     <button 
@@ -404,14 +456,14 @@ function App() {
 
               {/* Card Deck Selector */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Layers size={13} /> Deck:
+                <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Layers size={16} /> Deck Theme:
                 </span>
                 <select 
                   className="input-field" 
                   value={selectedDeck} 
                   onChange={(e) => setSelectedDeck(e.target.value)}
-                  style={{ width: 'auto', padding: '4px 8px', fontSize: '0.8rem' }}
+                  style={{ width: 'auto', padding: '6px 12px', fontSize: '0.9rem' }}
                 >
                   {Object.entries(CARD_DECKS).map(([key, deck]) => (
                     <option key={key} value={key}>{deck.name}</option>
@@ -422,10 +474,10 @@ function App() {
 
             {/* Online Multiplayer Lobby Panel */}
             {gameMode === 'friend' && (
-              <div className="glass-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div className="glass-panel" style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {!isNameSet ? (
-                  <form onSubmit={handleSaveName} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <h3 style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>Enter Nickname:</h3>
+                  <form onSubmit={handleSaveName} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <h3 style={{ fontSize: '0.95rem', color: 'var(--text-primary)', margin: 0, fontWeight: 700 }}>Enter Nickname:</h3>
                     <input
                       type="text"
                       className="input-field"
@@ -435,23 +487,23 @@ function App() {
                       maxLength={15}
                       required
                     />
-                    <button type="submit" className="btn-primary" style={{ width: '100%', padding: '8px', fontSize: '0.85rem' }}>
+                    <button type="submit" className="btn-primary" style={{ width: '100%', padding: '12px', fontSize: '0.95rem' }}>
                       Set Name
                     </button>
                   </form>
                 ) : !roomId ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <button onClick={handleCreateRoom} className="btn-primary" style={{ width: '100%', padding: '10px', fontSize: '0.85rem' }}>
+                    <button onClick={handleCreateRoom} className="btn-primary" style={{ width: '100%', padding: '12px', fontSize: '0.95rem' }}>
                       Create Room ({gridSize}×{gridSize})
                     </button>
                     
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <hr style={{ flex: 1, border: 'none', borderBottom: '1px solid var(--border-color)' }} />
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>OR JOIN</span>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>OR JOIN</span>
                       <hr style={{ flex: 1, border: 'none', borderBottom: '1px solid var(--border-color)' }} />
                     </div>
 
-                    <form onSubmit={handleJoinRoom} style={{ display: 'flex', gap: '6px' }}>
+                    <form onSubmit={handleJoinRoom} style={{ display: 'flex', gap: '8px' }}>
                       <input
                         type="text"
                         className="input-field"
@@ -459,22 +511,22 @@ function App() {
                         value={roomIdInput}
                         onChange={(e) => setRoomIdInput(e.target.value)}
                         required
-                        style={{ padding: '8px 10px', fontSize: '0.8rem' }}
+                        style={{ padding: '10px 12px', fontSize: '0.9rem' }}
                       />
-                      <button type="submit" className="btn-secondary" style={{ padding: '8px 12px', fontSize: '0.8rem' }}>
+                      <button type="submit" className="btn-secondary" style={{ padding: '10px 16px', fontSize: '0.9rem' }}>
                         Join
                       </button>
                     </form>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {/* Room code + share */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>
+                      <span style={{ fontSize: '0.9rem', fontWeight: 700 }}>
                         Code: <strong style={{ color: 'var(--accent-primary)', letterSpacing: '0.05em' }}>{roomId}</strong>
                       </span>
                       <button onClick={copyRoomLink} className="btn-icon" title="Copy link">
-                        {copied ? <Check size={14} style={{ color: 'var(--accent-success)' }} /> : <Share2 size={14} />}
+                        {copied ? <Check size={16} style={{ color: 'var(--accent-success)' }} /> : <Share2 size={16} />}
                       </button>
                     </div>
 
@@ -482,11 +534,11 @@ function App() {
                     {gameState?.gameStarted && !gameState.winner && (
                       <div style={{
                         textAlign: 'center',
-                        padding: '6px 10px',
+                        padding: '8px 12px',
                         background: isMyTurn ? 'rgba(0,168,132,0.15)' : 'rgba(0,0,0,0.04)',
-                        borderRadius: '8px',
-                        fontSize: '0.82rem',
-                        fontWeight: 700,
+                        borderRadius: '10px',
+                        fontSize: '0.9rem',
+                        fontWeight: 800,
                         color: isMyTurn ? 'var(--accent-primary)' : 'var(--text-secondary)'
                       }}>
                         {isMyTurn ? '🎯 Your turn!' : `⏳ ${opponentPlayer?.name || 'Opponent'}'s turn…`}
@@ -494,16 +546,16 @@ function App() {
                     )}
 
                     {/* Scores */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '4px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
                       {[
                         { player: myPlayer, label: `${playerName} (You)`, isActive: isMyTurn },
                         { player: opponentPlayer, label: opponentPlayer?.name || 'Waiting for opponent…', isActive: !isMyTurn && gameState?.gameStarted }
                       ].map(({ player, label, isActive }, i) => (
                         <div key={i} style={{
-                          display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem',
-                          padding: '7px 10px', borderRadius: '6px',
+                          display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem',
+                          padding: '8px 12px', borderRadius: '8px', fontWeight: 700,
                           background: isActive && gameState?.gameStarted && !gameState.winner ? 'rgba(0,168,132,0.08)' : 'rgba(0,0,0,0.03)',
-                          border: `1px solid ${isActive && gameState?.gameStarted && !gameState.winner ? 'var(--accent-primary)' : 'transparent'}`
+                          border: `1.5px solid ${isActive && gameState?.gameStarted && !gameState.winner ? 'var(--accent-primary)' : 'transparent'}`
                         }}>
                           <span>{label}</span>
                           <strong>{player?.score ?? 0} pairs</strong>
@@ -511,17 +563,27 @@ function App() {
                       ))}
                     </div>
 
+                    {/* Persistent Room Controls (Create New Room / Leave Room) */}
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                      <button onClick={handleCreateRoom} className="btn-secondary" style={{ flex: 1, padding: '8px 10px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                        <RefreshCw size={14} /> New Room
+                      </button>
+                      <button onClick={handleLeaveRoom} className="btn-secondary" style={{ padding: '8px 12px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                        <LogOut size={14} /> Exit
+                      </button>
+                    </div>
+
                     {/* Winner Banner */}
                     {gameState?.winner && (
                       <div style={{ marginTop: '6px', padding: '12px', background: 'rgba(0, 168, 132, 0.1)', borderRadius: '8px', border: '1px solid var(--accent-primary)', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
-                        <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--accent-primary)' }}>
+                        <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--accent-primary)' }}>
                           {gameState.winner === 'Draw' ? "🤝 It's a Tie!" : `🏆 ${gameState.winner} Wins!`}
                         </div>
                         <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
-                          <button onClick={handleRestartGame} className="btn-primary" style={{ flex: 1, padding: '7px', fontSize: '0.8rem', display: 'flex', gap: '4px', alignItems: 'center', justifyContent: 'center' }}>
-                            <RefreshCw size={12} /> Play Again
+                          <button onClick={handleRestartGame} className="btn-primary" style={{ flex: 1, padding: '8px', fontSize: '0.85rem', display: 'flex', gap: '4px', alignItems: 'center', justifyContent: 'center' }}>
+                            <RefreshCw size={14} /> Play Again
                           </button>
-                          <button onClick={handleLeaveRoom} className="btn-secondary" style={{ padding: '7px 12px', fontSize: '0.8rem' }}>
+                          <button onClick={handleLeaveRoom} className="btn-secondary" style={{ padding: '8px 12px', fontSize: '0.85rem' }}>
                             Leave
                           </button>
                         </div>
@@ -529,21 +591,21 @@ function App() {
                     )}
                   </div>
                 )}
-                {errorMsg && <div style={{ fontSize: '0.75rem', color: 'var(--accent-danger)', textAlign: 'center', marginTop: '4px' }}>{errorMsg}</div>}
+                {errorMsg && <div style={{ fontSize: '0.8rem', color: 'var(--accent-danger)', textAlign: 'center', marginTop: '4px' }}>{errorMsg}</div>}
               </div>
             )}
 
             {/* Pass & Play Scores */}
             {gameMode === 'local' && (
-              <div className="glass-panel" style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div className="glass-panel" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {[
                   { label: 'Player 1', score: localP1Score, active: localActivePlayer === 1 && !localWinner },
                   { label: 'Player 2', score: localP2Score, active: localActivePlayer === 2 && !localWinner }
                 ].map(({ label, score, active }, i) => (
                   <div key={i} style={{
-                    display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', padding: '7px 10px',
+                    display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', padding: '8px 12px', fontWeight: 700,
                     background: active ? 'rgba(0,168,132,0.1)' : 'rgba(0,0,0,0.03)',
-                    border: `1px solid ${active ? 'var(--accent-primary)' : 'transparent'}`, borderRadius: '7px'
+                    border: `1.5px solid ${active ? 'var(--accent-primary)' : 'transparent'}`, borderRadius: '8px'
                   }}>
                     <span>{label} {active ? '🎯' : ''}</span>
                     <strong>{score} pairs</strong>
@@ -551,36 +613,42 @@ function App() {
                 ))}
 
                 {localWinner && (
-                  <div style={{ marginTop: '6px', padding: '10px', background: 'rgba(0, 168, 132, 0.1)', borderRadius: '8px', border: '1px solid var(--accent-primary)', textAlign: 'center' }}>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--accent-primary)', marginBottom: '8px' }}>
+                  <div style={{ marginTop: '6px', padding: '12px', background: 'rgba(0, 168, 132, 0.1)', borderRadius: '8px', border: '1px solid var(--accent-primary)', textAlign: 'center' }}>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--accent-primary)', marginBottom: '8px' }}>
                       {localWinner === 'Draw' ? "🤝 It's a Tie!" : `🏆 ${localWinner} Wins!`}
                     </div>
-                    <button onClick={handleRestartGame} className="btn-primary" style={{ width: '100%', padding: '7px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                      <RefreshCw size={12} /> Play Again
+                    <button onClick={handleRestartGame} className="btn-primary" style={{ width: '100%', padding: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                      <RefreshCw size={14} /> Play Again
                     </button>
                   </div>
                 )}
               </div>
             )}
 
-            {/* Solo / Daily Score */}
+            {/* Solo / Daily Net Score Card */}
             {(gameMode === 'solo' || gameMode === 'daily') && (
-              <div className="glass-panel" style={{ padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Trophy size={14} style={{ color: 'var(--accent-warning)' }} /> Wasted Turns
-                </span>
-                <strong style={{ fontSize: '1.3rem', color: wastedTurns > 8 ? 'var(--accent-danger)' : 'var(--text-primary)' }}>
-                  {wastedTurns}
-                </strong>
+              <div className="glass-panel" style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Trophy size={18} style={{ color: 'var(--accent-warning)' }} /> Score
+                  </span>
+                  <strong style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--accent-primary)' }}>
+                    {netScore} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>pts</span>
+                  </strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--text-muted)', borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '6px' }}>
+                  <span>Matches: <strong style={{ color: 'var(--accent-success)' }}>{matchedPairsCount}</strong></span>
+                  <span>Wasted Turns: <strong style={{ color: wastedTurns > 8 ? 'var(--accent-danger)' : 'var(--text-secondary)' }}>{wastedTurns}</strong></span>
+                </div>
               </div>
             )}
 
             {/* Rules */}
-            <div className="glass-panel" style={{ padding: '14px' }}>
-              <h3 style={{ fontSize: '0.82rem', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)', margin: '0 0 6px' }}>
-                <BookOpen size={13} style={{ color: 'var(--accent-primary)' }} /> How to Play
+            <div className="glass-panel" style={{ padding: '16px' }}>
+              <h3 style={{ fontSize: '0.95rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-primary)', margin: '0 0 8px', fontWeight: 800 }}>
+                <BookOpen size={16} style={{ color: 'var(--accent-primary)' }} /> How to Play
               </h3>
-              <p style={{ fontSize: '0.73rem', color: 'var(--text-muted)', lineHeight: '1.45', margin: 0 }}>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.5', margin: 0 }}>
                 Flip 2 cards at a time to find matching pairs. A match keeps them open and earns a point — then flip again. No match? Cards flip back and the turn passes. Most pairs wins!
               </p>
             </div>
@@ -604,9 +672,10 @@ function App() {
                         onClick={() => handleSoloCardClick(index)}
                       >
                         <div className="tile-inner">
-                          <div className="tile-face tile-front" />
+                          <div className="tile-face tile-front">
+                            {!isVisible && <span className="tile-watermark">MT</span>}
+                          </div>
                           <div className="tile-face tile-back">
-                            {!isVisible && <span className="tile-back-watermark">MT</span>}
                             {isVisible ? card.symbol : ''}
                           </div>
                         </div>
@@ -616,7 +685,7 @@ function App() {
                 </div>
               )}
 
-              {/* Online Multiplayer Board — driven entirely by server game-state */}
+              {/* Online Multiplayer Board — driven by server state + instant optimistic local flip */}
               {gameMode === 'friend' && gameState && (gameState.gameStarted || gameState.winner) && (
                 <div className={`game-grid grid-${gridSize}`}>
                   {gameState.board.map((card, index) => {
@@ -629,9 +698,10 @@ function App() {
                         style={{ cursor: isMyTurn && !card.isFlipped && !card.isMatched && !gameState.winner ? 'pointer' : 'default' }}
                       >
                         <div className="tile-inner">
-                          <div className="tile-face tile-front" />
+                          <div className="tile-face tile-front">
+                            {!isVisible && <span className="tile-watermark">MT</span>}
+                          </div>
                           <div className="tile-face tile-back">
-                            {!isVisible && <span className="tile-back-watermark">MT</span>}
                             {isVisible ? card.symbol : ''}
                           </div>
                         </div>
@@ -652,15 +722,20 @@ function App() {
               backdropFilter: 'blur(4px)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
             }}>
-              <div className="glass-panel" style={{ width: '90%', maxWidth: '300px', padding: '28px', textAlign: 'center' }}>
+              <div className="glass-panel" style={{ width: '90%', maxWidth: '320px', padding: '28px', textAlign: 'center' }}>
                 <div style={{ fontSize: '3.5rem', marginBottom: '8px' }}>🎉</div>
-                <h2 style={{ fontSize: '1.4rem', margin: '0 0 12px', color: 'var(--accent-primary)' }}>Board Cleared!</h2>
-                <div style={{ padding: '12px', background: 'rgba(0, 168, 132, 0.08)', borderRadius: '8px', marginBottom: '16px' }}>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Wasted Turns</span>
-                  <strong style={{ fontSize: '2rem', color: 'var(--accent-primary)' }}>{wastedTurns}</strong>
+                <h2 style={{ fontSize: '1.4rem', margin: '0 0 8px', color: 'var(--accent-primary)' }}>Board Cleared!</h2>
+                
+                <div style={{ padding: '14px', background: 'rgba(0, 168, 132, 0.08)', borderRadius: '12px', marginBottom: '16px', border: '1px solid var(--accent-primary)' }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Final Score</span>
+                  <strong style={{ fontSize: '2.2rem', color: 'var(--accent-primary)', display: 'block' }}>{netScore} pts</strong>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    {matchedPairsCount} Matches • {wastedTurns} Wasted Turns
+                  </span>
                 </div>
-                <button onClick={handleRestartGame} className="btn-primary" style={{ width: '100%', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                  <RefreshCw size={14} /> Play Again
+
+                <button onClick={handleRestartGame} className="btn-primary" style={{ width: '100%', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                  <RefreshCw size={16} /> Play Again
                 </button>
               </div>
             </div>
