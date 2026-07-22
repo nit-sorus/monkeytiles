@@ -90,12 +90,12 @@ p {
   transition: all 0.2s ease;
 }
 
-/* Game Grid Container - 0.8x Opaque Glass Panel */
+/* Game Grid Container - 0.1x Opaque Glass Panel */
 .grid-panel {
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
   border-radius: 16px;
   padding: 16px;
