@@ -155,6 +155,9 @@ function App() {
   const [errorMsg, setErrorMsg] = useState('');
   const [copied, setCopied] = useState(false);
 
+  // Clash Royale Style Emote Overlay State
+  const [activeEmotes, setActiveEmotes] = useState([]);
+
   // Initialize Boards for all modes (including placeholder board for Friend lobby)
   useEffect(() => {
     if (gameMode === 'daily') {
@@ -223,9 +226,16 @@ function App() {
       setErrorMsg('');
     });
 
-    newSocket.on('player-left', () => {
-      setErrorMsg('Opponent left the game.');
-      setGameState(prev => prev ? { ...prev, gameStarted: false, winner: null, board: [] } : null);
+    newSocket.on('player-left', (msg) => {
+      setErrorMsg(msg || 'A player left the game.');
+      setGameState(prev => prev ? { ...prev, gameStarted: false, winner: null } : null);
+    });
+
+    newSocket.on('receive-emote', (emoteData) => {
+      setActiveEmotes(prev => [...prev, emoteData]);
+      setTimeout(() => {
+        setActiveEmotes(prev => prev.filter(e => e.id !== emoteData.id));
+      }, 3000);
     });
 
     newSocket.on('error-message', (err) => {
@@ -369,21 +379,16 @@ function App() {
     setErrorMsg('');
     const newUrl = `${window.location.origin}${window.location.pathname}`;
     window.history.pushState({ path: newUrl }, '', newUrl);
-    setGameMode('solo');
   };
 
-  const copyRoomLink = () => {
-    const link = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
-    navigator.clipboard.writeText(link).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+  const handleSendEmote = (emote) => {
+    if (socket && roomId) {
+      socket.emit('send-emote', { emote });
+    }
   };
 
-  const myPlayer = gameState?.players.find(p => p.id === socket?.id);
-  const opponentPlayer = gameState?.players.find(p => p.id !== socket?.id);
-  const isMyTurn = gameState && socket && !gameState.winner &&
-    gameState.players[gameState.activePlayerIndex]?.id === socket.id;
+  const isMyTurn = gameState && gameState.players && gameState.players[gameState.activePlayerIndex]?.id === socket?.id;
+  const activePlayerObj = gameState?.players ? gameState.players[gameState.activePlayerIndex] : null;
 
   // Calculate Net Score for Solo / Daily mode
   const matchedPairsCount = Math.floor(soloBoard.filter(c => c.isMatched).length / 2);
@@ -523,9 +528,6 @@ function App() {
                       <span style={{ fontSize: '0.9rem', fontWeight: 700 }}>
                         Code: <strong style={{ color: 'var(--accent-primary)', letterSpacing: '0.05em' }}>{roomId}</strong>
                       </span>
-                      <button onClick={copyRoomLink} className="btn-icon" title="Copy link">
-                        {copied ? <Check size={16} style={{ color: 'var(--accent-success)' }} /> : <Share2 size={16} />}
-                      </button>
                     </div>
 
                     {/* Turn indicator */}
@@ -539,50 +541,66 @@ function App() {
                         fontWeight: 800,
                         color: isMyTurn ? 'var(--accent-primary)' : 'var(--text-secondary)'
                       }}>
-                        {isMyTurn ? '🎯 Your turn!' : `⏳ ${opponentPlayer?.name || 'Opponent'}'s turn…`}
+                        {isMyTurn ? '🎯 Your turn!' : `⏳ ${activePlayerObj?.name || 'Player'}'s turn…`}
                       </div>
                     )}
 
-                    {/* Scores */}
+                    {/* Lobby Status / Players Leaderboard with Win Tracking */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
-                      {[
-                        { player: myPlayer, label: `${playerName} (You)`, isActive: isMyTurn },
-                        { player: opponentPlayer, label: opponentPlayer?.name || 'Waiting for opponent…', isActive: !isMyTurn && gameState?.gameStarted }
-                      ].map(({ player, label, isActive }, i) => (
-                        <div key={i} style={{
-                          display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem',
-                          padding: '8px 12px', borderRadius: '8px', fontWeight: 700,
-                          background: isActive && gameState?.gameStarted && !gameState.winner ? 'rgba(0,168,132,0.08)' : 'rgba(0,0,0,0.03)',
-                          border: `1.5px solid ${isActive && gameState?.gameStarted && !gameState.winner ? 'var(--accent-primary)' : 'transparent'}`
-                        }}>
-                          <span>{label}</span>
-                          <strong>{player?.score ?? 0} pairs</strong>
-                        </div>
-                      ))}
+                      {gameState?.players?.map((p, i) => {
+                        const isMe = p.id === socket?.id;
+                        const isCurrent = i === gameState.activePlayerIndex;
+                        return (
+                          <div key={p.id || i} style={{
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.88rem',
+                            padding: '8px 12px', borderRadius: '8px', fontWeight: 700,
+                            background: isCurrent && gameState?.gameStarted && !gameState.winner ? 'rgba(0,168,132,0.12)' : 'rgba(0,0,0,0.03)',
+                            border: `1.5px solid ${isCurrent && gameState?.gameStarted && !gameState.winner ? 'var(--accent-primary)' : 'transparent'}`
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>P{i+1}</span>
+                              <span>{p.name} {isMe && '(You)'}</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', background: 'rgba(0,168,132,0.12)', padding: '2px 8px', borderRadius: '6px', fontWeight: 800 }}>
+                                🏆 {p.wins || 0}
+                              </span>
+                              <strong>{p.score}</strong>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
+
+                    {/* Host Start Game Button (for 2, 3, or 4 players) */}
+                    {!gameState?.gameStarted && gameState?.players?.length >= 2 && gameState?.hostId === socket?.id && (
+                      <button onClick={() => socket?.emit('start-game')} className="btn-primary" style={{ width: '100%', padding: '10px', fontSize: '0.9rem', marginTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                        <Play size={16} /> Start Game ({gameState.players.length}/4 Players)
+                      </button>
+                    )}
+
+                    {!gameState?.gameStarted && gameState?.players?.length < 2 && (
+                      <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', textAlign: 'center', padding: '6px' }}>
+                        Waiting for at least 1 more player to join (Up to 4 players)…
+                      </div>
+                    )}
 
                     {/* Persistent Room Controls (Create New Room / Leave Room) */}
                     <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
-                      <button onClick={handleCreateRoom} className="btn-secondary" style={{ flex: 1, padding: '8px 10px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                        <RefreshCw size={14} /> New Room
-                      </button>
-                      <button onClick={handleLeaveRoom} className="btn-secondary" style={{ padding: '8px 12px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                        <LogOut size={14} /> Exit
+                      <button onClick={handleLeaveRoom} className="btn-secondary" style={{ width: '100%', padding: '8px 12px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                        <LogOut size={14} /> Exit Room
                       </button>
                     </div>
 
                     {/* Winner Banner */}
                     {gameState?.winner && (
                       <div style={{ marginTop: '6px', padding: '12px', background: 'rgba(0, 168, 132, 0.1)', borderRadius: '8px', border: '1px solid var(--accent-primary)', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
-                        <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--accent-primary)' }}>
-                          {gameState.winner === 'Draw' ? "🤝 It's a Tie!" : `🏆 ${gameState.winner} Wins!`}
+                        <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--accent-primary)', textAlign: 'center' }}>
+                          🏆 {gameState.winner}
                         </div>
                         <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
                           <button onClick={handleRestartGame} className="btn-primary" style={{ flex: 1, padding: '8px', fontSize: '0.85rem', display: 'flex', gap: '4px', alignItems: 'center', justifyContent: 'center' }}>
                             <RefreshCw size={14} /> Play Again
-                          </button>
-                          <button onClick={handleLeaveRoom} className="btn-secondary" style={{ padding: '8px 12px', fontSize: '0.85rem' }}>
-                            Leave
                           </button>
                         </div>
                       </div>
@@ -640,18 +658,22 @@ function App() {
                 </div>
               </div>
             )}
-
-            {/* Rules */}
-            <div className="glass-panel" style={{ padding: '16px' }}>
-              <h3 style={{ fontSize: '0.95rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-primary)', margin: '0 0 8px', fontWeight: 800 }}>
-                <BookOpen size={16} style={{ color: 'var(--accent-primary)' }} /> How to Play
-              </h3>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.5', margin: 0 }}>
-                Flip 2 cards at a time to find matching pairs. Each match earns <strong style={{ color: 'var(--accent-primary)' }}>+10 pts</strong>! Mismatches cost <strong style={{ color: 'var(--accent-danger)' }}>-5 pts</strong> and flip back.
-              </p>
-            </div>
-
-
+            
+            {/* Clash Royale Style Monkey Emote Bar */}
+            {gameMode === 'friend' && roomId && (
+              <div className="emote-bar">
+                {['🐵', '🙈', '🙉', '🙊', '🍌', '👑', '🔥', '🏆', '😂', '😎'].map((emoji) => (
+                  <button
+                    key={emoji}
+                    className="emote-btn"
+                    onClick={() => handleSendEmote(emoji)}
+                    title={`Send ${emoji} emote`}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            )}
 
           </div>
 
@@ -743,6 +765,21 @@ function App() {
 
         </div>
       </main>
+
+      {/* Floating Clash Royale Emote Overlay */}
+      {activeEmotes.length > 0 && (
+        <div className="emote-pop-container">
+          {activeEmotes.map((e) => (
+            <div key={e.id} className="emote-bubble">
+              <span style={{ fontSize: '2.0rem' }}>{e.emote}</span>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <strong style={{ fontSize: '0.85rem', color: 'var(--accent-primary)' }}>{e.senderName}</strong>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Emote</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <footer style={{ padding: '10px 0', fontSize: '0.7rem', textAlign: 'center', color: 'var(--text-muted)' }}>
         monkeytiles © 2026

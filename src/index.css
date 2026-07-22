@@ -425,3 +425,82 @@ footer {
   42% { transform: scale(1.12); }
   70% { transform: scale(1); }
 }
+
+/* Clash Royale Style Emote Bar */
+.emote-bar {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.95);
+  border: 2px solid var(--accent-primary);
+  border-radius: 30px;
+  padding: 6px 14px;
+  box-shadow: 0 4px 16px rgba(0, 168, 132, 0.2);
+  width: fit-content;
+  margin: 10px auto 0;
+}
+
+.emote-btn {
+  font-size: 1.5rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  padding: 4px;
+  line-height: 1;
+}
+
+.emote-btn:hover {
+  transform: scale(1.4) rotate(-5deg);
+}
+
+.emote-btn:active {
+  transform: scale(0.9);
+}
+
+/* Floating Clash Royale Emote Pop Bubble */
+.emote-pop-container {
+  position: fixed;
+  top: 15%;
+  right: 5%;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.emote-bubble {
+  background: #ffffff;
+  border: 3px solid var(--accent-primary);
+  border-radius: 20px;
+  padding: 8px 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  animation: emotePop 3.0s forwards cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes emotePop {
+  0% {
+    opacity: 0;
+    transform: scale(0.2) translateY(30px);
+  }
+  15% {
+    opacity: 1;
+    transform: scale(1.2) translateY(0);
+  }
+  25% {
+    transform: scale(1.0);
+  }
+  80% {
+    opacity: 1;
+    transform: scale(1.0) translateY(-10px);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.5) translateY(-40px);
+  }
+}

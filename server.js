@@ -75,12 +75,13 @@ function buildBoardView(board) {
 function broadcastGameState(roomId, room) {
   const baseState = {
     id: room.id,
-    players: room.players.map(p => ({ id: p.id, name: p.name, score: p.score })),
+    players: room.players.map(p => ({ id: p.id, name: p.name, score: p.score, wins: p.wins || 0 })),
     gridSize: room.gridSize,
     activePlayerIndex: room.activePlayerIndex,
     gameStarted: room.gameStarted,
     winner: room.winner,
     isWaiting: room.isWaiting,
+    hostId: room.players[0] ? room.players[0].id : null,
     board: buildBoardView(room.board)
   };
 
@@ -97,7 +98,7 @@ io.on('connection', (socket) => {
     const size = parseInt(gridSize) || 6;
     const newRoom = {
       id: roomId,
-      players: [{ id: socket.id, name: playerName || 'Player 1', score: 0 }],
+      players: [{ id: socket.id, name: playerName || 'Player 1', score: 0, wins: 0 }],
       board: [],
       gridSize: size,
       firstFlippedIndex: null,
@@ -116,7 +117,7 @@ io.on('connection', (socket) => {
     console.log(`Room created: ${roomId} with gridSize: ${size} by ${playerName}`);
   });
 
-  // Join a Room
+  // Join a Room (supports up to 4 players)
   socket.on('join-room', ({ roomId, playerName }) => {
     const room = rooms.get(roomId);
     if (!room) {
@@ -124,33 +125,51 @@ io.on('connection', (socket) => {
       return;
     }
 
-    if (room.players.length >= 2) {
-      socket.emit('error-message', 'Room is full');
+    if (room.players.length >= 4) {
+      socket.emit('error-message', 'Room is full (max 4 players)');
+      return;
+    }
+
+    if (room.gameStarted) {
+      socket.emit('error-message', 'Game is already in progress');
       return;
     }
 
     room.players.push({
       id: socket.id,
       name: playerName || `Player ${room.players.length + 1}`,
-      score: 0
+      score: 0,
+      wins: 0
     });
 
     socket.join(roomId);
     socket.roomId = roomId;
 
-    console.log(`User ${playerName} joined room: ${roomId}`);
-    
-    if (room.players.length === 2) {
-      room.gameStarted = true;
-      room.board = generateBoard(room.gridSize);
-      room.activePlayerIndex = Math.floor(Math.random() * 2);
-      broadcastGameState(roomId, room);
-    } else {
-      broadcastGameState(roomId, room);
-    }
+    console.log(`User ${playerName} joined room: ${roomId}. Total players: ${room.players.length}`);
+    broadcastGameState(roomId, room);
   });
 
-  // Flip Card — Server is the single source of truth
+  // Host starts game
+  socket.on('start-game', () => {
+    const roomId = socket.roomId;
+    const room = rooms.get(roomId);
+    if (!room) return;
+    if (room.players.length < 2) {
+      socket.emit('error-message', 'Need at least 2 players to start!');
+      return;
+    }
+
+    room.players.forEach(p => p.score = 0);
+    room.board = generateBoard(room.gridSize);
+    room.activePlayerIndex = Math.floor(Math.random() * room.players.length);
+    room.gameStarted = true;
+    room.isWaiting = false;
+    room.winner = null;
+
+    broadcastGameState(roomId, room);
+  });
+
+  // Flip Card — Server is single source of truth
   socket.on('flip-card', (cardIndex) => {
     const roomId = socket.roomId;
     const room = rooms.get(roomId);
@@ -158,7 +177,7 @@ io.on('connection', (socket) => {
     if (!room || !room.gameStarted || room.isWaiting) return;
 
     const activePlayer = room.players[room.activePlayerIndex];
-    if (activePlayer.id !== socket.id) return; // silently ignore, not their turn
+    if (!activePlayer || activePlayer.id !== socket.id) return; // silently ignore, not their turn
 
     const card = room.board[cardIndex];
     if (!card || card.isFlipped || card.isMatched) return;
@@ -178,30 +197,33 @@ io.on('connection', (socket) => {
       room.firstFlippedIndex = null;
 
       if (firstCard.symbol === card.symbol) {
-        // MATCH FOUND — keep flipped
+        // MATCH FOUND — keep flipped & add score
         firstCard.isMatched = true;
         card.isMatched = true;
         room.players[room.activePlayerIndex].score++;
         
         const allMatched = room.board.every(c => c.isMatched);
         if (allMatched) {
-          const p1 = room.players[0];
-          const p2 = room.players[1];
-          let winner;
-          if (p1.score > p2.score) winner = p1.name;
-          else if (p2.score > p1.score) winner = p2.name;
-          else winner = 'Draw';
-          room.winner = winner;
+          const maxScore = Math.max(...room.players.map(p => p.score));
+          const winners = room.players.filter(p => p.score === maxScore);
+          
+          if (winners.length === 1) {
+            winners[0].wins = (winners[0].wins || 0) + 1;
+            room.winner = winners[0].name;
+          } else {
+            winners.forEach(w => w.wins = (w.wins || 0) + 1);
+            room.winner = `Draw between ${winners.map(w => w.name).join(' & ')}`;
+          }
           room.gameStarted = false;
         }
 
-        // On a match, the same player keeps their turn
+        // On match, active player keeps turn
         broadcastGameState(roomId, room);
 
       } else {
         // MISMATCH — show both briefly, then flip back
         room.isWaiting = true;
-        broadcastGameState(roomId, room); // show both face-up for 1.2s
+        broadcastGameState(roomId, room);
 
         setTimeout(() => {
           const currentRoom = rooms.get(roomId);
@@ -210,13 +232,30 @@ io.on('connection', (socket) => {
           firstCard.isFlipped = false;
           card.isFlipped = false;
           currentRoom.isWaiting = false;
-          // Switch turn to the other player
-          currentRoom.activePlayerIndex = currentRoom.activePlayerIndex === 0 ? 1 : 0;
+          
+          // Rotate turn to next player (2, 3, or 4 players)
+          currentRoom.activePlayerIndex = (currentRoom.activePlayerIndex + 1) % currentRoom.players.length;
           
           broadcastGameState(roomId, currentRoom);
         }, 1200);
       }
     }
+  });
+
+  // Emote Broadcasting (Clash Royale Style)
+  socket.on('send-emote', ({ emote }) => {
+    const roomId = socket.roomId;
+    const room = rooms.get(roomId);
+    if (!room) return;
+    const player = room.players.find(p => p.id === socket.id);
+    const senderName = player ? player.name : 'Player';
+
+    io.to(roomId).emit('receive-emote', {
+      socketId: socket.id,
+      senderName,
+      emote,
+      id: Date.now() + Math.random()
+    });
   });
 
   // Restart Game
@@ -228,7 +267,7 @@ io.on('connection', (socket) => {
     room.players.forEach(p => p.score = 0);
     room.board = generateBoard(room.gridSize);
     room.firstFlippedIndex = null;
-    room.activePlayerIndex = Math.floor(Math.random() * 2);
+    room.activePlayerIndex = Math.floor(Math.random() * room.players.length);
     room.gameStarted = true;
     room.isWaiting = false;
     room.winner = null;
@@ -248,11 +287,10 @@ io.on('connection', (socket) => {
         rooms.delete(roomId);
         console.log(`Room ${roomId} deleted (empty)`);
       } else {
-        room.gameStarted = false;
-        room.winner = null;
-        room.board = [];
-        room.firstFlippedIndex = null;
-        io.to(roomId).emit('player-left', 'Opponent disconnected');
+        if (room.activePlayerIndex >= room.players.length) {
+          room.activePlayerIndex = 0;
+        }
+        io.to(roomId).emit('player-left', 'A player left the room');
         broadcastGameState(roomId, room);
       }
     }
