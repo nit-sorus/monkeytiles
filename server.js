@@ -119,9 +119,14 @@ io.on('connection', (socket) => {
 
   // Join a Room (supports up to 4 players)
   socket.on('join-room', ({ roomId, playerName }) => {
-    const room = rooms.get(roomId);
+    let cleanCode = (roomId || '').trim().toUpperCase();
+    if (!cleanCode.startsWith('M-') && /^\d{4}$/.test(cleanCode)) {
+      cleanCode = 'M-' + cleanCode;
+    }
+
+    const room = rooms.get(cleanCode);
     if (!room) {
-      socket.emit('error-message', 'Room not found');
+      socket.emit('error-message', 'Invalid room code. Please check the code and try again.');
       return;
     }
 
@@ -142,11 +147,11 @@ io.on('connection', (socket) => {
       wins: 0
     });
 
-    socket.join(roomId);
-    socket.roomId = roomId;
+    socket.join(cleanCode);
+    socket.roomId = cleanCode;
 
-    console.log(`User ${playerName} joined room: ${roomId}. Total players: ${room.players.length}`);
-    broadcastGameState(roomId, room);
+    console.log(`User ${playerName} joined room: ${cleanCode}. Total players: ${room.players.length}`);
+    broadcastGameState(cleanCode, room);
   });
 
   // Host starts game

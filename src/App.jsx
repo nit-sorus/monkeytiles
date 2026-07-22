@@ -8,7 +8,9 @@ import {
   Share2, 
   BookOpen,
   Layers,
-  LogOut
+  LogOut,
+  Loader2,
+  Play
 } from 'lucide-react';
 
 const SOCKET_URL = import.meta.env.DEV 
@@ -154,6 +156,7 @@ function App() {
   const [gameState, setGameState] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [copied, setCopied] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
 
   // Clash Royale Style Emote Overlay State
   const [activeEmotes, setActiveEmotes] = useState([]);
@@ -205,12 +208,17 @@ function App() {
 
     newSocket.on('room-created', (createdRoomId) => {
       setRoomId(createdRoomId);
+      setIsJoining(false);
       setErrorMsg('');
       const newUrl = `${window.location.origin}${window.location.pathname}?room=${createdRoomId}`;
       window.history.pushState({ path: newUrl }, '', newUrl);
     });
 
     newSocket.on('game-state', (state) => {
+      if (state && state.id) {
+        setRoomId(state.id);
+      }
+      setIsJoining(false);
       setGameState(prev => {
         // Trigger sound if a new match was made on server
         if (prev && state && state.board) {
@@ -227,6 +235,7 @@ function App() {
     });
 
     newSocket.on('player-left', (msg) => {
+      setIsJoining(false);
       setErrorMsg(msg || 'A player left the game.');
       setGameState(prev => prev ? { ...prev, gameStarted: false, winner: null } : null);
     });
@@ -239,6 +248,7 @@ function App() {
     });
 
     newSocket.on('error-message', (err) => {
+      setIsJoining(false);
       setErrorMsg(err);
     });
 
@@ -346,6 +356,8 @@ function App() {
 
   const handleCreateRoom = () => {
     if (!socket) return;
+    setErrorMsg('');
+    setIsJoining(true);
     setGameState(null);
     socket.emit('create-room', { playerName, gridSize });
   };
@@ -353,9 +365,15 @@ function App() {
   const handleJoinRoom = (e) => {
     e.preventDefault();
     if (!socket || !roomIdInput.trim()) return;
-    const cleanRoomId = roomIdInput.trim().toUpperCase();
-    socket.emit('join-room', { roomId: cleanRoomId, playerName });
-    setRoomId(cleanRoomId);
+    setErrorMsg('');
+    setIsJoining(true);
+
+    let cleanCode = roomIdInput.trim().toUpperCase();
+    if (!cleanCode.startsWith('M-') && /^\d{4}$/.test(cleanCode)) {
+      cleanCode = 'M-' + cleanCode;
+    }
+
+    socket.emit('join-room', { roomId: cleanCode, playerName });
   };
 
   const handleRestartGame = () => {
@@ -377,8 +395,36 @@ function App() {
     setRoomIdInput('');
     setGameState(null);
     setErrorMsg('');
+    setIsJoining(false);
     const newUrl = `${window.location.origin}${window.location.pathname}`;
     window.history.pushState({ path: newUrl }, '', newUrl);
+  };
+
+  const copyRoomLink = () => {
+    const link = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(link).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2500);
+      }).catch(() => fallbackCopy(link));
+    } else {
+      fallbackCopy(link);
+    }
+  };
+
+  const fallbackCopy = (text) => {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch (err) {
+      console.error('Copy fallback failed', err);
+    }
+    document.body.removeChild(textArea);
   };
 
   const handleSendEmote = (emote) => {
@@ -496,8 +542,14 @@ function App() {
                   </form>
                 ) : !roomId ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <button onClick={handleCreateRoom} className="btn-primary" style={{ width: '100%', padding: '12px', fontSize: '0.95rem' }}>
-                      Create Room ({gridSize}×{gridSize})
+                    <button onClick={handleCreateRoom} disabled={isJoining} className="btn-primary" style={{ width: '100%', padding: '12px', fontSize: '0.95rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                      {isJoining ? (
+                        <>
+                          <Loader2 size={18} className="anim-rotate" /> Creating Room...
+                        </>
+                      ) : (
+                        `Create Room (${gridSize}×${gridSize})`
+                      )}
                     </button>
                     
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -510,24 +562,48 @@ function App() {
                       <input
                         type="text"
                         className="input-field"
-                        placeholder="Room Code"
+                        placeholder="Room Code (e.g. M-1234 or 1234)"
                         value={roomIdInput}
                         onChange={(e) => setRoomIdInput(e.target.value)}
                         required
+                        disabled={isJoining}
                         style={{ padding: '10px 12px', fontSize: '0.9rem' }}
                       />
-                      <button type="submit" className="btn-secondary" style={{ padding: '10px 16px', fontSize: '0.9rem' }}>
-                        Join
+                      <button type="submit" disabled={isJoining} className="btn-secondary" style={{ padding: '10px 16px', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {isJoining ? (
+                          <>
+                            <Loader2 size={16} className="anim-rotate" /> Joining...
+                          </>
+                        ) : (
+                          'Join'
+                        )}
                       </button>
                     </form>
+
+                    {errorMsg && (
+                      <div style={{ padding: '8px 10px', background: 'rgba(235, 87, 87, 0.12)', border: '1px solid var(--accent-danger)', borderRadius: '8px', fontSize: '0.82rem', color: 'var(--accent-danger)', fontWeight: 700, textAlign: 'center' }}>
+                        ❌ {errorMsg}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {/* Room code + share */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.9rem', fontWeight: 700 }}>
+                    {/* Room code + Share Link */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.03)', padding: '8px 12px', borderRadius: '10px', border: '1px solid rgba(0,0,0,0.06)' }}>
+                      <span style={{ fontSize: '0.95rem', fontWeight: 800 }}>
                         Code: <strong style={{ color: 'var(--accent-primary)', letterSpacing: '0.05em' }}>{roomId}</strong>
                       </span>
+                      <button onClick={copyRoomLink} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {copied ? (
+                          <>
+                            <Check size={16} style={{ color: 'var(--accent-success)' }} /> Copied!
+                          </>
+                        ) : (
+                          <>
+                            <Share2 size={16} style={{ color: 'var(--accent-primary)' }} /> Share Link
+                          </>
+                        )}
+                      </button>
                     </div>
 
                     {/* Turn indicator */}
