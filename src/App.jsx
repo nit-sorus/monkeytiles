@@ -334,15 +334,7 @@ function App() {
     const card = gameState.board[cardIndex];
     if (!card || card.isFlipped || card.isMatched) return;
 
-    // Instant local flip (0ms latency UI update)
-    setGameState(prev => {
-      if (!prev) return prev;
-      const updatedBoard = prev.board.map((c, idx) => 
-        idx === cardIndex ? { ...c, isFlipped: true } : c
-      );
-      return { ...prev, board: updatedBoard };
-    });
-
+    // Send flip action to server and wait for simultaneous flip + symbol reveal
     socket.emit('flip-card', cardIndex);
   };
 
