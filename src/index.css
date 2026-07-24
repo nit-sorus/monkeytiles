@@ -435,25 +435,28 @@ footer {
 /* Clash Royale Style Emote Bar */
 .emote-bar {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 4px;
   justify-content: center;
   align-items: center;
   background: rgba(255, 255, 255, 0.95);
   border: 2px solid var(--accent-primary);
-  border-radius: 30px;
-  padding: 6px 14px;
+  border-radius: 20px;
+  padding: 4px 10px;
   box-shadow: 0 4px 16px rgba(0, 168, 132, 0.2);
-  width: fit-content;
-  margin: 10px auto 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin: 8px auto 0;
 }
 
 .emote-btn {
-  font-size: 1.5rem;
+  font-size: clamp(1.2rem, 4.5vw, 1.5rem);
   background: none;
   border: none;
   cursor: pointer;
   transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  padding: 4px;
+  padding: 2px 4px;
   line-height: 1;
 }
 
@@ -469,7 +472,7 @@ footer {
 .emote-pop-container {
   position: fixed;
   top: 15%;
-  right: 5%;
+  right: 10%;
   z-index: 1000;
   display: flex;
   flex-direction: column;
@@ -478,35 +481,34 @@ footer {
 }
 
 .emote-bubble {
-  background: #ffffff;
-  border: 3px solid var(--accent-primary);
-  border-radius: 20px;
-  padding: 8px 16px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  font-size: 4rem;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
   display: flex;
   align-items: center;
-  gap: 10px;
-  animation: emotePop 3.0s forwards cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  justify-content: center;
+  animation: emotePop 2.5s forwards ease-out;
 }
 
 @keyframes emotePop {
   0% {
     opacity: 0;
-    transform: scale(0.2) translateY(30px);
+    transform: scale(0.5) translateY(40px);
   }
   15% {
     opacity: 1;
     transform: scale(1.2) translateY(0);
   }
-  25% {
+  30% {
     transform: scale(1.0);
-  }
-  80% {
     opacity: 1;
-    transform: scale(1.0) translateY(-10px);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.0) translateY(-40px);
   }
   100% {
     opacity: 0;
-    transform: scale(0.5) translateY(-40px);
+    transform: scale(0.8) translateY(-100px) rotate(10deg);
+    filter: blur(4px);
   }
 }

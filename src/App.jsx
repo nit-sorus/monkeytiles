@@ -847,11 +847,7 @@ function App() {
         <div className="emote-pop-container">
           {activeEmotes.map((e) => (
             <div key={e.id} className="emote-bubble">
-              <span style={{ fontSize: '2.0rem' }}>{e.emote}</span>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <strong style={{ fontSize: '0.85rem', color: 'var(--accent-primary)' }}>{e.senderName}</strong>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Emote</span>
-              </div>
+              {e.emote}
             </div>
           ))}
         </div>
