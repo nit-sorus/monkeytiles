@@ -66,7 +66,7 @@ function generateBoard(gridSize = 6) {
 function buildBoardView(board) {
   return board.map(card => ({
     id: card.id,
-    symbol: (card.isFlipped || card.isMatched) ? card.symbol : null,
+    symbol: card.symbol,
     isFlipped: card.isFlipped,
     isMatched: card.isMatched
   }));
@@ -75,7 +75,13 @@ function buildBoardView(board) {
 function broadcastGameState(roomId, room) {
   const baseState = {
     id: room.id,
-    players: room.players.map(p => ({ id: p.id, name: p.name, score: p.score, wins: p.wins || 0 })),
+    players: room.players.map(p => ({ 
+      id: p.id, 
+      name: p.name, 
+      score: p.score, 
+      wins: p.wins || 0,
+      isDisconnected: p.isDisconnected 
+    })),
     gridSize: room.gridSize,
     activePlayerIndex: room.activePlayerIndex,
     gameStarted: room.gameStarted,
@@ -93,12 +99,21 @@ io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
 
   // Create a Room
-  socket.on('create-room', ({ playerName, gridSize }) => {
+  socket.on('create-room', ({ playerName, gridSize, sessionToken }) => {
     const roomId = `M-${Math.floor(1000 + Math.random() * 9000)}`;
     const size = parseInt(gridSize) || 6;
     const newRoom = {
       id: roomId,
-      players: [{ id: socket.id, name: playerName || 'Player 1', score: 0, wins: 0 }],
+      hostToken: sessionToken,
+      lastActivityAt: Date.now(),
+      players: [{ 
+        id: socket.id, 
+        sessionToken, 
+        name: playerName || 'Player 1', 
+        score: 0, 
+        wins: 0,
+        isDisconnected: false 
+      }],
       board: [],
       gridSize: size,
       firstFlippedIndex: null,
@@ -118,7 +133,7 @@ io.on('connection', (socket) => {
   });
 
   // Join a Room (supports up to 4 players)
-  socket.on('join-room', ({ roomId, playerName }) => {
+  socket.on('join-room', ({ roomId, playerName, sessionToken }) => {
     let cleanCode = (roomId || '').trim().toUpperCase();
     if (!cleanCode.startsWith('M-') && /^\d{4}$/.test(cleanCode)) {
       cleanCode = 'M-' + cleanCode;
@@ -140,11 +155,16 @@ io.on('connection', (socket) => {
       return;
     }
 
+    // Update room activity
+    room.lastActivityAt = Date.now();
+
     room.players.push({
       id: socket.id,
+      sessionToken,
       name: playerName || `Player ${room.players.length + 1}`,
       score: 0,
-      wins: 0
+      wins: 0,
+      isDisconnected: false
     });
 
     socket.join(cleanCode);
@@ -154,18 +174,52 @@ io.on('connection', (socket) => {
     broadcastGameState(cleanCode, room);
   });
 
+  // Rejoin a Room
+  socket.on('rejoin-room', ({ sessionToken }) => {
+    if (!sessionToken) return;
+    
+    for (const [roomId, room] of rooms.entries()) {
+      const player = room.players.find(p => p.sessionToken === sessionToken);
+      if (player) {
+        // Stop the disconnect deletion timer
+        if (player.disconnectTimeout) {
+          clearTimeout(player.disconnectTimeout);
+          player.disconnectTimeout = null;
+        }
+        
+        // Restore player
+        player.id = socket.id;
+        player.isDisconnected = false;
+        
+        room.lastActivityAt = Date.now();
+        socket.join(roomId);
+        socket.roomId = roomId;
+        
+        console.log(`User ${player.name} reconnected to room: ${roomId}`);
+        socket.emit('room-created', roomId); // Force client to see they joined successfully
+        broadcastGameState(roomId, room);
+        return;
+      }
+    }
+  });
+
   // Host starts game
   socket.on('start-game', () => {
     const roomId = socket.roomId;
     const room = rooms.get(roomId);
     if (!room) return;
+    
+    room.lastActivityAt = Date.now();
+
     if (room.players.length < 2) {
       socket.emit('error-message', 'Need at least 2 players to start!');
       return;
     }
 
+    // Reset scores for all players
     room.players.forEach(p => p.score = 0);
     room.board = generateBoard(room.gridSize);
+    room.firstFlippedIndex = null;
     room.activePlayerIndex = Math.floor(Math.random() * room.players.length);
     room.gameStarted = true;
     room.isWaiting = false;
@@ -174,12 +228,13 @@ io.on('connection', (socket) => {
     broadcastGameState(roomId, room);
   });
 
-  // Flip Card — Server is single source of truth
+  // Flip Card logic
   socket.on('flip-card', (cardIndex) => {
     const roomId = socket.roomId;
     const room = rooms.get(roomId);
+    if (!room || room.isWaiting || room.winner || !room.gameStarted) return;
     
-    if (!room || !room.gameStarted || room.isWaiting) return;
+    room.lastActivityAt = Date.now();
 
     const activePlayer = room.players[room.activePlayerIndex];
     if (!activePlayer || activePlayer.id !== socket.id) return; // silently ignore, not their turn
@@ -252,6 +307,8 @@ io.on('connection', (socket) => {
     const roomId = socket.roomId;
     const room = rooms.get(roomId);
     if (!room) return;
+    room.lastActivityAt = Date.now();
+    
     const player = room.players.find(p => p.id === socket.id);
     const senderName = player ? player.name : 'Player';
 
@@ -268,6 +325,8 @@ io.on('connection', (socket) => {
     const roomId = socket.roomId;
     const room = rooms.get(roomId);
     if (!room) return;
+    
+    room.lastActivityAt = Date.now();
 
     room.players.forEach(p => p.score = 0);
     room.board = generateBoard(room.gridSize);
@@ -286,21 +345,51 @@ io.on('connection', (socket) => {
     const roomId = socket.roomId;
     if (roomId && rooms.has(roomId)) {
       const room = rooms.get(roomId);
-      room.players = room.players.filter(p => p.id !== socket.id);
-
-      if (room.players.length === 0) {
-        rooms.delete(roomId);
-        console.log(`Room ${roomId} deleted (empty)`);
-      } else {
-        if (room.activePlayerIndex >= room.players.length) {
-          room.activePlayerIndex = 0;
-        }
-        io.to(roomId).emit('player-left', 'A player left the room');
+      const player = room.players.find(p => p.id === socket.id);
+      
+      if (player) {
+        player.isDisconnected = true;
+        
+        // Start 60 second grace period
+        player.disconnectTimeout = setTimeout(() => {
+          const currentRoom = rooms.get(roomId);
+          if (!currentRoom) return;
+          
+          currentRoom.players = currentRoom.players.filter(p => p.sessionToken !== player.sessionToken);
+          
+          // Delete room if empty OR if the host left
+          if (currentRoom.players.length === 0 || currentRoom.hostToken === player.sessionToken) {
+            io.to(roomId).emit('room-closed');
+            rooms.delete(roomId);
+            console.log(`Room ${roomId} deleted (empty or host left)`);
+          } else {
+            if (currentRoom.activePlayerIndex >= currentRoom.players.length) {
+              currentRoom.activePlayerIndex = 0;
+            }
+            io.to(roomId).emit('player-left', 'A player left the room');
+            broadcastGameState(roomId, currentRoom);
+          }
+        }, 60000);
+        
+        // Broadcast immediately to show greyed out state
         broadcastGameState(roomId, room);
       }
     }
   });
 });
+
+// Zombie room cleanup interval (every 1 minute)
+setInterval(() => {
+  const now = Date.now();
+  for (const [roomId, room] of rooms.entries()) {
+    // If no activity for 10 minutes (600,000 ms)
+    if (now - room.lastActivityAt > 600000) {
+      io.to(roomId).emit('room-closed');
+      rooms.delete(roomId);
+      console.log(`Zombie room deleted due to inactivity: ${roomId}`);
+    }
+  }
+}, 60000);
 
 httpServer.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);

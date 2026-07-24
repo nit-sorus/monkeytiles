@@ -150,6 +150,14 @@ function App() {
 
   // Online Friend Mode Socket State
   const [playerName, setPlayerName] = useState(() => localStorage.getItem('memory_playerName') || '');
+  const [sessionToken] = useState(() => {
+    let token = localStorage.getItem('memory_sessionToken');
+    if (!token) {
+      token = window.crypto && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36);
+      localStorage.setItem('memory_sessionToken', token);
+    }
+    return token;
+  });
   const [isNameSet, setIsNameSet] = useState(false);
   const [roomIdInput, setRoomIdInput] = useState('');
   const [roomId, setRoomId] = useState('');
@@ -202,15 +210,29 @@ function App() {
 
     const newSocket = io(SOCKET_URL, {
       transports: ['websocket'],
-      reconnectionAttempts: 5
+      reconnectionAttempts: 10
     });
     setSocket(newSocket);
+
+    newSocket.on('connect', () => {
+      // Secretly pass Session Token to resume any dropped sessions
+      newSocket.emit('rejoin-room', { sessionToken });
+    });
 
     newSocket.on('room-created', (createdRoomId) => {
       setRoomId(createdRoomId);
       setIsJoining(false);
       setErrorMsg('');
       const newUrl = `${window.location.origin}${window.location.pathname}?room=${createdRoomId}`;
+      window.history.pushState({ path: newUrl }, '', newUrl);
+    });
+
+    newSocket.on('room-closed', (msg) => {
+      setIsJoining(false);
+      setGameState(null);
+      setRoomId('');
+      setErrorMsg(msg || 'Room was closed.');
+      const newUrl = `${window.location.origin}${window.location.pathname}`;
       window.history.pushState({ path: newUrl }, '', newUrl);
     });
 
@@ -334,6 +356,15 @@ function App() {
     const card = gameState.board[cardIndex];
     if (!card || card.isFlipped || card.isMatched) return;
 
+    // Instant local flip (0ms latency UI update using Client-Side Prediction)
+    setGameState(prev => {
+      if (!prev) return prev;
+      const updatedBoard = prev.board.map((c, idx) => 
+        idx === cardIndex ? { ...c, isFlipped: true } : c
+      );
+      return { ...prev, board: updatedBoard };
+    });
+
     // Send flip action to server and wait for simultaneous flip + symbol reveal
     socket.emit('flip-card', cardIndex);
   };
@@ -355,7 +386,7 @@ function App() {
     setErrorMsg('');
     setIsJoining(true);
     setGameState(null);
-    socket.emit('create-room', { playerName, gridSize });
+    socket.emit('create-room', { playerName, gridSize, sessionToken });
     
     setTimeout(() => {
       setIsJoining(prev => {
@@ -383,7 +414,7 @@ function App() {
       cleanCode = 'M-' + cleanCode;
     }
 
-    socket.emit('join-room', { roomId: cleanCode, playerName });
+    socket.emit('join-room', { roomId: cleanCode, playerName, sessionToken });
     
     setTimeout(() => {
       setIsJoining(prev => {
@@ -653,9 +684,11 @@ function App() {
                             background: isCurrent && gameState?.gameStarted && !gameState.winner ? 'rgba(0,168,132,0.12)' : 'rgba(0,0,0,0.03)',
                             border: `1.5px solid ${isCurrent && gameState?.gameStarted && !gameState.winner ? 'var(--accent-primary)' : 'transparent'}`
                           }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: p.isDisconnected ? 0.5 : 1 }}>
                               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>P{i+1}</span>
-                              <span>{p.name} {isMe && '(You)'}</span>
+                              <span style={{ textDecoration: p.isDisconnected ? 'line-through' : 'none' }}>
+                                {p.name} {isMe && '(You)'} {p.isDisconnected && <span style={{ fontSize: '0.7rem', color: 'var(--accent-danger)' }}>(Offline)</span>}
+                              </span>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                               <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', background: 'rgba(0,168,132,0.12)', padding: '2px 8px', borderRadius: '6px', fontWeight: 800 }}>
