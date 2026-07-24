@@ -165,6 +165,7 @@ function App() {
   const [errorMsg, setErrorMsg] = useState('');
   const [copied, setCopied] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
+  const [showPermanentRoomModal, setShowPermanentRoomModal] = useState(false);
 
   // Clash Royale Style Emote Overlay State
   const [activeEmotes, setActiveEmotes] = useState([]);
@@ -399,22 +400,9 @@ function App() {
     }, 6000);
   };
 
-  const handleJoinRoom = (e) => {
-    e.preventDefault();
-    if (!socket || !roomIdInput.trim()) return;
-    if (!socket.connected) {
-      setErrorMsg('Not connected to server. Please check your connection.');
-      return;
-    }
-    setErrorMsg('');
+  const executeJoinRoom = (cleanCode, name) => {
     setIsJoining(true);
-
-    let cleanCode = roomIdInput.trim().toUpperCase();
-    if (!cleanCode.startsWith('M-') && /^\d{4}$/.test(cleanCode)) {
-      cleanCode = 'M-' + cleanCode;
-    }
-
-    socket.emit('join-room', { roomId: cleanCode, playerName, sessionToken });
+    socket.emit('join-room', { roomId: cleanCode, playerName: name, sessionToken });
     
     setTimeout(() => {
       setIsJoining(prev => {
@@ -425,6 +413,28 @@ function App() {
         return prev;
       });
     }, 6000);
+  };
+
+  const handleJoinRoom = (e) => {
+    e.preventDefault();
+    if (!socket || !roomIdInput.trim()) return;
+    if (!socket.connected) {
+      setErrorMsg('Not connected to server. Please check your connection.');
+      return;
+    }
+    setErrorMsg('');
+
+    let cleanCode = roomIdInput.trim().toUpperCase();
+    if (!cleanCode.startsWith('M-') && /^\d{4}$/.test(cleanCode)) {
+      cleanCode = 'M-' + cleanCode;
+    }
+
+    if (cleanCode === 'M-0314') {
+      setShowPermanentRoomModal(true);
+      return;
+    }
+
+    executeJoinRoom(cleanCode, playerName);
   };
 
   const handleRestartGame = () => {
@@ -502,6 +512,44 @@ function App() {
           </h1>
         </a>
       </header>
+
+      {/* Permanent Room 0314 Modal */}
+      {showPermanentRoomModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '400px', padding: '30px', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <h2 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 800 }}>Welcome to 0314</h2>
+            <p style={{ margin: 0, color: 'var(--text-secondary)' }}>Who are you?</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <button 
+                className="btn-primary" 
+                onClick={() => {
+                  setPlayerName('Manya');
+                  localStorage.setItem('memory_playerName', 'Manya');
+                  setShowPermanentRoomModal(false);
+                  executeJoinRoom('M-0314', 'Manya');
+                }}
+              >
+                Manya
+              </button>
+              <button 
+                className="btn-primary" 
+                onClick={() => {
+                  setPlayerName('Nitish');
+                  localStorage.setItem('memory_playerName', 'Nitish');
+                  setShowPermanentRoomModal(false);
+                  executeJoinRoom('M-0314', 'Nitish');
+                }}
+                style={{ background: 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%)' }}
+              >
+                Nitish
+              </button>
+            </div>
+            <button className="btn-secondary" onClick={() => setShowPermanentRoomModal(false)} style={{ marginTop: '10px' }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Container */}
       <main style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 16px 24px' }}>
@@ -669,6 +717,19 @@ function App() {
                         color: isMyTurn ? 'var(--accent-primary)' : 'var(--text-secondary)'
                       }}>
                         {isMyTurn ? '🎯 Your turn!' : `⏳ ${activePlayerObj?.name || 'Player'}'s turn…`}
+                      </div>
+                    )}
+
+                    {/* Lifetime Scoreboard for M-0314 */}
+                    {gameState?.id === 'M-0314' && gameState?.lifetimeScores && (
+                      <div style={{ background: 'linear-gradient(135deg, rgba(255,193,7,0.1) 0%, rgba(255,152,0,0.1) 100%)', border: '1px solid rgba(255,193,7,0.3)', padding: '12px', borderRadius: '12px', marginBottom: '8px' }}>
+                        <div style={{ textAlign: 'center', fontSize: '0.85rem', fontWeight: 800, color: 'var(--accent-warning)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '10px' }}>
+                          ⭐ Lifetime Scoreboard
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                          <span>Manya: <span style={{ color: 'var(--accent-warning)', fontSize: '1.1rem' }}>{gameState.lifetimeScores.Manya}</span></span>
+                          <span>Nitish: <span style={{ color: 'var(--accent-warning)', fontSize: '1.1rem' }}>{gameState.lifetimeScores.Nitish}</span></span>
+                        </div>
                       </div>
                     )}
 

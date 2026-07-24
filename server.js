@@ -3,6 +3,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { MongoClient } from 'mongodb';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,6 +35,70 @@ app.use((req, res, next) => {
 
 // Game state storage
 const rooms = new Map();
+
+// MongoDB Setup for Persistent Scores
+const mongoUri = process.env.MONGODB_URI;
+let db = null;
+let scoresCollection = null;
+let lifetimeScores = { Manya: 0, Nitish: 0 }; 
+
+if (mongoUri) {
+  const client = new MongoClient(mongoUri);
+  client.connect().then(() => {
+    console.log('Connected to MongoDB');
+    db = client.db('monkeytiles');
+    scoresCollection = db.collection('scores');
+    
+    scoresCollection.findOne({ _id: 'room_0314_lifetime' }).then(doc => {
+      if (doc) {
+        lifetimeScores = { Manya: doc.Manya || 0, Nitish: doc.Nitish || 0 };
+        console.log('Loaded lifetime scores:', lifetimeScores);
+      } else {
+        scoresCollection.insertOne({ _id: 'room_0314_lifetime', Manya: 0, Nitish: 0 });
+      }
+    });
+  }).catch(err => {
+    console.error('MongoDB connection error:', err);
+  });
+}
+
+async function updateLifetimeScore(winnerName) {
+  if (!winnerName) return;
+  const name = winnerName.toLowerCase();
+  let key = null;
+  if (name.includes('nitish')) key = 'Nitish';
+  if (name.includes('manya')) key = 'Manya';
+  if (!key) return;
+
+  lifetimeScores[key] += 1;
+  
+  if (scoresCollection) {
+    try {
+      await scoresCollection.updateOne(
+        { _id: 'room_0314_lifetime' },
+        { $inc: { [key]: 1 } },
+        { upsert: true }
+      );
+    } catch (err) {
+      console.error('Failed to update score:', err);
+    }
+  }
+}
+
+// Initialize permanent room 0314
+rooms.set('M-0314', {
+  id: 'M-0314',
+  hostToken: 'PERMANENT',
+  lastActivityAt: Date.now(),
+  players: [],
+  board: [],
+  gridSize: 6,
+  firstFlippedIndex: null,
+  activePlayerIndex: 0,
+  gameStarted: false,
+  isWaiting: false,
+  winner: null
+});
 
 // Expanded symbols for memory cards (supports up to 8x8 grid = 32 pairs)
 const SYMBOL_POOL = [
@@ -88,7 +153,8 @@ function broadcastGameState(roomId, room) {
     winner: room.winner,
     isWaiting: room.isWaiting,
     hostId: room.players[0] ? room.players[0].id : null,
-    board: buildBoardView(room.board)
+    board: buildBoardView(room.board),
+    lifetimeScores: room.id === 'M-0314' ? lifetimeScores : undefined
   };
 
   // Send identical state to all players in the room
@@ -262,23 +328,31 @@ io.on('connection', (socket) => {
         card.isMatched = true;
         room.players[room.activePlayerIndex].score++;
         
-        const allMatched = room.board.every(c => c.isMatched);
-        if (allMatched) {
-          const maxScore = Math.max(...room.players.map(p => p.score));
-          const winners = room.players.filter(p => p.score === maxScore);
-          
-          if (winners.length === 1) {
-            winners[0].wins = (winners[0].wins || 0) + 1;
-            room.winner = winners[0].name;
+        if (room.board.every(c => c.isMatched)) {
+          const p1Score = room.players[0]?.score || 0;
+          const p2Score = room.players[1]?.score || 0;
+          if (p1Score > p2Score) {
+            room.winner = room.players[0].name;
+            room.players[0].wins = (room.players[0].wins || 0) + 1;
+          } else if (p2Score > p1Score) {
+            room.winner = room.players[1].name;
+            room.players[1].wins = (room.players[1].wins || 0) + 1;
           } else {
-            winners.forEach(w => w.wins = (w.wins || 0) + 1);
-            room.winner = `Draw between ${winners.map(w => w.name).join(' & ')}`;
+            room.winner = 'Tie';
           }
           room.gameStarted = false;
+          
+          // Permanent Room 0314 Logic
+          if (room.id === 'M-0314' && room.winner !== 'Tie') {
+            updateLifetimeScore(room.winner).then(() => {
+              broadcastGameState(roomId, room);
+            });
+          } else {
+            broadcastGameState(roomId, room);
+          }
+        } else {
+          broadcastGameState(roomId, room);
         }
-
-        // On match, active player keeps turn
-        broadcastGameState(roomId, room);
 
       } else {
         // MISMATCH — show both briefly, then flip back
@@ -357,8 +431,8 @@ io.on('connection', (socket) => {
           
           currentRoom.players = currentRoom.players.filter(p => p.sessionToken !== player.sessionToken);
           
-          // Delete room if empty OR if the host left
-          if (currentRoom.players.length === 0 || currentRoom.hostToken === player.sessionToken) {
+          // Delete room if empty OR if the host left (except for M-0314)
+          if (currentRoom.id !== 'M-0314' && (currentRoom.players.length === 0 || currentRoom.hostToken === player.sessionToken)) {
             io.to(roomId).emit('room-closed');
             rooms.delete(roomId);
             console.log(`Room ${roomId} deleted (empty or host left)`);
@@ -382,6 +456,9 @@ io.on('connection', (socket) => {
 setInterval(() => {
   const now = Date.now();
   for (const [roomId, room] of rooms.entries()) {
+    // Exempt M-0314 from cleanup
+    if (roomId === 'M-0314') continue;
+    
     // If no activity for 10 minutes (600,000 ms)
     if (now - room.lastActivityAt > 600000) {
       io.to(roomId).emit('room-closed');
