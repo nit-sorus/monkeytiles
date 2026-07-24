@@ -387,7 +387,7 @@ function App() {
     setErrorMsg('');
     setIsJoining(true);
     setGameState(null);
-    socket.emit('create-room', { playerName, gridSize, sessionToken });
+    socket.emit('create-room', { playerName, gridSize, sessionToken, deck: selectedDeck });
     
     setTimeout(() => {
       setIsJoining(prev => {
@@ -449,8 +449,11 @@ function App() {
 
   const handleLeaveRoom = () => {
     if (socket) {
-      socket.disconnect();
-      setSocket(null);
+      socket.emit('explicit-leave', { sessionToken });
+      setTimeout(() => {
+        socket.disconnect();
+        setSocket(null);
+      }, 50);
     }
     setRoomId('');
     setRoomIdInput('');
@@ -611,7 +614,8 @@ function App() {
                   className="input-field" 
                   value={selectedDeck} 
                   onChange={(e) => setSelectedDeck(e.target.value)}
-                  style={{ width: 'auto', padding: '6px 12px', fontSize: '0.9rem' }}
+                  disabled={gameMode === 'friend' && !!roomId}
+                  style={{ width: 'auto', padding: '6px 12px', fontSize: '0.9rem', opacity: gameMode === 'friend' && !!roomId ? 0.6 : 1 }}
                 >
                   {Object.entries(CARD_DECKS).map(([key, deck]) => (
                     <option key={key} value={key}>{deck.name}</option>

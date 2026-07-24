@@ -100,17 +100,17 @@ rooms.set('M-0314', {
   winner: null
 });
 
-// Expanded symbols for memory cards (supports up to 8x8 grid = 32 pairs)
-const SYMBOL_POOL = [
-  '🐼', '🦁', '🐯', '🐨', '🦊', '🐸', '🐙', '🦋', 
-  '🦖', '🦄', '🦈', '🐝', '🦉', '🦩', '🦚', '🐉', 
-  '🍄', '🌵', '🐱', '🐶', '🐷', '🐮', '🐹', '🐰', 
-  '🐻', '🐵', '🐔', '🐧', '🐦', '🐣', '🦅', '🦆'
-];
+// Card Decks (synchronized with frontend)
+const CARD_DECKS = {
+  animals: [ '🐼', '🦁', '🐯', '🐨', '🦊', '🐸', '🐙', '🦋', '🦖', '🦄', '🦈', '🐝', '🦉', '🦩', '🦚', '🐉', '🍄', '🌵', '🐱', '🐶', '🐷', '🐮', '🐹', '🐰', '🐻', '🐵', '🐔', '🐧', '🐦', '🐣', '🦅', '🦆' ],
+  food: [ '🍎', '🍕', '🍔', '🍟', '🌭', '🍿', '🍩', '🍪', '🎂', '🍦', '🍓', '🍇', '🍉', '🥑', '🌮', '🍣', '🧋', '☕', '🥨', '🥐', '🥞', '🧇', '🥓', '🍳', '🧀', '🫐', '🍍', '🥭', '🍒', '🍐', '🍋', '🍊' ],
+  fun: [ '⚽', '🏀', '🏈', '⚾', '🎾', '🏐', '🎱', '🎯', '🎨', '🎸', '🎧', '🚀', '⛵', '🛸', '🚗', '🎮', '🎲', '♟️', '🎪', '🎭', '🎟️', '🏆', '🥇', '🎁', '🎈', '🎉', '⚡', '🔥', '🌈', '⭐', '💎', '🔮' ]
+};
 
-function generateBoard(gridSize = 6) {
+function generateBoard(gridSize = 6, deckId = 'animals') {
   const numPairs = (gridSize * gridSize) / 2;
-  const shuffledPool = [...SYMBOL_POOL].sort(() => 0.5 - Math.random());
+  const pool = CARD_DECKS[deckId] || CARD_DECKS.animals;
+  const shuffledPool = [...pool].sort(() => 0.5 - Math.random());
   const selectedSymbols = shuffledPool.slice(0, numPairs);
   const cards = [...selectedSymbols, ...selectedSymbols];
   const shuffledCards = cards.sort(() => 0.5 - Math.random());
@@ -152,6 +152,7 @@ function broadcastGameState(roomId, room) {
     gameStarted: room.gameStarted,
     winner: room.winner,
     isWaiting: room.isWaiting,
+    deck: room.deck,
     hostId: room.players[0] ? room.players[0].id : null,
     board: buildBoardView(room.board),
     lifetimeScores: room.id === 'M-0314' ? lifetimeScores : undefined
@@ -165,7 +166,7 @@ io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
 
   // Create a Room
-  socket.on('create-room', ({ playerName, gridSize, sessionToken }) => {
+  socket.on('create-room', ({ playerName, gridSize, sessionToken, deck }) => {
     const roomId = `M-${Math.floor(1000 + Math.random() * 9000)}`;
     const size = parseInt(gridSize) || 6;
     const newRoom = {
@@ -182,6 +183,7 @@ io.on('connection', (socket) => {
       }],
       board: [],
       gridSize: size,
+      deck: deck || 'animals',
       firstFlippedIndex: null,
       activePlayerIndex: 0,
       gameStarted: false,
@@ -284,7 +286,7 @@ io.on('connection', (socket) => {
 
     // Reset scores for all players
     room.players.forEach(p => p.score = 0);
-    room.board = generateBoard(room.gridSize);
+    room.board = generateBoard(room.gridSize, room.deck);
     room.firstFlippedIndex = null;
     room.activePlayerIndex = Math.floor(Math.random() * room.players.length);
     room.gameStarted = true;
@@ -403,7 +405,7 @@ io.on('connection', (socket) => {
     room.lastActivityAt = Date.now();
 
     room.players.forEach(p => p.score = 0);
-    room.board = generateBoard(room.gridSize);
+    room.board = generateBoard(room.gridSize, room.deck);
     room.firstFlippedIndex = null;
     room.activePlayerIndex = Math.floor(Math.random() * room.players.length);
     room.gameStarted = true;
@@ -411,6 +413,27 @@ io.on('connection', (socket) => {
     room.winner = null;
 
     broadcastGameState(roomId, room);
+  });
+
+  // Explicit Leave (bypasses grace period)
+  socket.on('explicit-leave', ({ sessionToken }) => {
+    const roomId = socket.roomId;
+    if (roomId && rooms.has(roomId)) {
+      const room = rooms.get(roomId);
+      room.players = room.players.filter(p => p.sessionToken !== sessionToken);
+      
+      if (room.id !== 'M-0314' && (room.players.length === 0 || room.hostToken === sessionToken)) {
+        io.to(roomId).emit('room-closed');
+        rooms.delete(roomId);
+        console.log(`Room ${roomId} deleted (empty or host left explicitly)`);
+      } else {
+        if (room.activePlayerIndex >= room.players.length) {
+          room.activePlayerIndex = 0;
+        }
+        io.to(roomId).emit('player-left', 'A player explicitly left the room');
+        broadcastGameState(roomId, room);
+      }
+    }
   });
 
   // Disconnect
