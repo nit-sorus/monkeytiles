@@ -495,12 +495,12 @@ function App() {
     <>
       {/* Header */}
       <header style={{ margin: '16px auto 24px', width: '90%', maxWidth: '1200px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <a href={window.location.pathname} style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}>
           <span style={{ fontSize: '3.0rem', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.4))' }}>🐵</span>
           <h1 style={{ fontSize: '2.0rem', margin: 0, fontWeight: 800, textTransform: 'lowercase', letterSpacing: '0.25em', color: '#ffffff', textShadow: '0 2px 8px rgba(0,0,0,0.6)' }}>
             monkeytiles
           </h1>
-        </div>
+        </a>
       </header>
 
       {/* Main Container */}
