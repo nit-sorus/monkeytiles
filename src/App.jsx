@@ -356,15 +356,33 @@ function App() {
 
   const handleCreateRoom = () => {
     if (!socket) return;
+    if (!socket.connected) {
+      setErrorMsg('Not connected to server. Please check your connection.');
+      return;
+    }
     setErrorMsg('');
     setIsJoining(true);
     setGameState(null);
     socket.emit('create-room', { playerName, gridSize });
+    
+    setTimeout(() => {
+      setIsJoining(prev => {
+        if (prev) {
+          setErrorMsg('Server request timed out. Please try again.');
+          return false;
+        }
+        return prev;
+      });
+    }, 6000);
   };
 
   const handleJoinRoom = (e) => {
     e.preventDefault();
     if (!socket || !roomIdInput.trim()) return;
+    if (!socket.connected) {
+      setErrorMsg('Not connected to server. Please check your connection.');
+      return;
+    }
     setErrorMsg('');
     setIsJoining(true);
 
@@ -374,6 +392,16 @@ function App() {
     }
 
     socket.emit('join-room', { roomId: cleanCode, playerName });
+    
+    setTimeout(() => {
+      setIsJoining(prev => {
+        if (prev) {
+          setErrorMsg('Server request timed out. Please try again.');
+          return false;
+        }
+        return prev;
+      });
+    }, 6000);
   };
 
   const handleRestartGame = () => {
