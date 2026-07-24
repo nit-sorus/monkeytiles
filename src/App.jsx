@@ -380,29 +380,19 @@ function App() {
 
   const handleCreateRoom = () => {
     if (!socket) return;
-    if (!socket.connected) {
-      setErrorMsg('Not connected to server. Please check your connection.');
-      return;
+    
+    const isBooting = socket && !socket.connected;
+    if (isBooting) {
+      setErrorMsg('Waking up server... this may take up to 50 seconds.');
+    } else {
+      setErrorMsg('');
     }
-    setErrorMsg('');
+    
     setIsJoining(true);
     setGameState(null);
     socket.emit('create-room', { playerName, gridSize, sessionToken, deck: selectedDeck });
     
-    setTimeout(() => {
-      setIsJoining(prev => {
-        if (prev) {
-          setErrorMsg('Server request timed out. Please try again.');
-          return false;
-        }
-        return prev;
-      });
-    }, 6000);
-  };
-
-  const executeJoinRoom = (cleanCode, name) => {
-    setIsJoining(true);
-    socket.emit('join-room', { roomId: cleanCode, playerName: name, sessionToken });
+    const timeoutMs = isBooting ? 60000 : 8000;
     
     setTimeout(() => {
       setIsJoining(prev => {
@@ -412,16 +402,36 @@ function App() {
         }
         return prev;
       });
-    }, 6000);
+    }, timeoutMs);
+  };
+
+  const executeJoinRoom = (cleanCode, name) => {
+    setIsJoining(true);
+    
+    // If the socket isn't connected yet (server is booting from sleep), give it more time.
+    const isBooting = socket && !socket.connected;
+    if (isBooting) {
+      setErrorMsg('Waking up server... this may take up to 50 seconds.');
+    }
+    
+    socket.emit('join-room', { roomId: cleanCode, playerName: name, sessionToken });
+    
+    const timeoutMs = isBooting ? 60000 : 8000;
+    
+    setTimeout(() => {
+      setIsJoining(prev => {
+        if (prev) {
+          setErrorMsg('Server request timed out. Please try again.');
+          return false;
+        }
+        return prev;
+      });
+    }, timeoutMs);
   };
 
   const handleJoinRoom = (e) => {
     e.preventDefault();
     if (!socket || !roomIdInput.trim()) return;
-    if (!socket.connected) {
-      setErrorMsg('Not connected to server. Please check your connection.');
-      return;
-    }
     setErrorMsg('');
 
     let cleanCode = roomIdInput.trim().toUpperCase();
@@ -450,10 +460,6 @@ function App() {
   const handleLeaveRoom = () => {
     if (socket) {
       socket.emit('explicit-leave', { sessionToken });
-      setTimeout(() => {
-        socket.disconnect();
-        setSocket(null);
-      }, 50);
     }
     setRoomId('');
     setRoomIdInput('');
