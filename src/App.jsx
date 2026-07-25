@@ -515,7 +515,7 @@ function App() {
   return (
     <>
       {/* Header */}
-      <header style={{ margin: '16px auto 24px', width: '90%', maxWidth: '1200px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <header style={{ margin: '8px auto 16px', width: '90%', maxWidth: '1200px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <a href={window.location.pathname} style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}>
           <span style={{ fontSize: '3.0rem', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.4))' }}>🐵</span>
           <h1 style={{ fontSize: '2.0rem', margin: 0, fontWeight: 800, textTransform: 'lowercase', letterSpacing: '0.25em', color: '#ffffff', textShadow: '0 2px 8px rgba(0,0,0,0.6)' }}>
@@ -834,7 +834,11 @@ function App() {
 
                     {!gameState?.gameStarted && gameState?.players?.length < 2 && (
                       <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', textAlign: 'center', padding: '6px' }}>
-                        Waiting for at least 1 more player to join (Up to 4 players)…
+                        {gameState?.id === 'M-0314' ? (
+                          `Waiting for ${gameState.players[0]?.name?.toLowerCase() === 'nitish' ? 'Manya' : 'Nitish'}...`
+                        ) : (
+                          'Waiting for at least 1 more player to join (Up to 4 players)…'
+                        )}
                       </div>
                     )}
 

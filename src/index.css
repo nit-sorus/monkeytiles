@@ -52,6 +52,13 @@ body {
   animation: pageFadeIn 0.25s ease-out forwards;
 }
 
+@media (min-width: 769px) {
+  body {
+    height: 100vh;
+    overflow: hidden; /* Prevent vertical scrolling on desktop */
+  }
+}
+
 @keyframes pageFadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -159,18 +166,18 @@ p {
   margin: 0 auto;
 }
 
-/* Resized grids (0.8x of 1.5x) to fit beautifully on a single screen */
+/* Resized grids to fit beautifully on a single screen without scrolling */
 .grid-4 {
   grid-template-columns: repeat(4, 1fr);
-  max-width: 380px;
+  max-width: min(380px, 70vh);
 }
 .grid-6 {
   grid-template-columns: repeat(6, 1fr);
-  max-width: 530px;
+  max-width: min(530px, 75vh);
 }
 .grid-8 {
   grid-template-columns: repeat(8, 1fr);
-  max-width: 690px;
+  max-width: min(690px, 80vh);
 }
 
 /* 3D Tile Card Styles - Translucent Glass Boxes that Merge with Background */
