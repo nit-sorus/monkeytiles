@@ -10,7 +10,8 @@ import {
   Layers,
   LogOut,
   Loader2,
-  Play
+  Play,
+  PlusCircle
 } from 'lucide-react';
 
 const SOCKET_URL = import.meta.env.DEV 
