@@ -396,6 +396,21 @@ io.on('connection', (socket) => {
     });
   });
 
+  // Update Room Settings (Host only)
+  socket.on('update-room-settings', ({ gridSize, deck }) => {
+    const roomId = socket.roomId;
+    const room = rooms.get(roomId);
+    if (!room || room.gameStarted) return;
+    
+    // Verify sender is host
+    if (room.players.length > 0 && room.players[0].id === socket.id) {
+      if (gridSize) room.gridSize = parseInt(gridSize);
+      if (deck) room.deck = deck;
+      room.lastActivityAt = Date.now();
+      broadcastGameState(roomId, room);
+    }
+  });
+
   // Restart Game
   socket.on('restart-game', () => {
     const roomId = socket.roomId;
@@ -419,6 +434,9 @@ io.on('connection', (socket) => {
   socket.on('explicit-leave', ({ sessionToken }) => {
     const roomId = socket.roomId;
     if (roomId && rooms.has(roomId)) {
+      socket.leave(roomId);
+      socket.roomId = null;
+      
       const room = rooms.get(roomId);
       room.players = room.players.filter(p => p.sessionToken !== sessionToken);
       
@@ -427,6 +445,11 @@ io.on('connection', (socket) => {
         rooms.delete(roomId);
         console.log(`Room ${roomId} deleted (empty or host left explicitly)`);
       } else {
+        if (room.id === 'M-0314' && room.players.length === 0) {
+          room.gameStarted = false;
+          room.isWaiting = false;
+          room.winner = null;
+        }
         if (room.activePlayerIndex >= room.players.length) {
           room.activePlayerIndex = 0;
         }
