@@ -254,6 +254,7 @@ function App() {
         return state;
       });
       if (state.gridSize) setGridSize(state.gridSize);
+      if (state.deck) setSelectedDeck(state.deck);
       setErrorMsg('');
     });
 
@@ -568,67 +569,71 @@ function App() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
             
             {/* Game Modes Panel */}
-            <div className="glass-panel" style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <h2 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-                <Gamepad2 size={18} style={{ color: 'var(--accent-primary)' }} /> Select Game Mode
-              </h2>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                {[
-                  { key: 'solo', label: '🎮 Play Solo' },
-                  { key: 'friend', label: '👥 With Friend' },
-                ].map(({ key, label }) => (
-                  <button
-                    key={key}
-                    className={`btn-secondary${gameMode === key ? ' active' : ''}`}
-                    onClick={() => setGameMode(key)}
-                    style={{
-                      padding: '12px 10px',
-                      fontSize: '0.92rem',
-                      justifyContent: 'center',
-                      fontWeight: 700
-                    }}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Grid Size Selector */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', borderTop: '1px solid rgba(0,0,0,0.08)', paddingTop: '12px' }}>
-                <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Grid Size:</span>
-                <div className="grid-toggle-bar">
-                  {[4, 6, 8].map(size => (
-                    <button 
-                      key={size}
-                      className={`grid-toggle-btn${gridSize === size ? ' active' : ''}`}
-                      onClick={() => { if (gameMode !== 'friend' || !roomId) setGridSize(size); }}
-                      disabled={gameMode === 'friend' && !!roomId}
+            {gameMode !== 'friend' && (
+              <div className="glass-panel" style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <h2 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                  <Gamepad2 size={18} style={{ color: 'var(--accent-primary)' }} /> Select Game Mode
+                </h2>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  {[
+                    { key: 'solo', label: '🎮 Play Solo' },
+                    { key: 'friend', label: '👥 With Friend' },
+                  ].map(({ key, label }) => (
+                    <button
+                      key={key}
+                      className={`btn-secondary${gameMode === key ? ' active' : ''}`}
+                      onClick={() => setGameMode(key)}
+                      style={{
+                        padding: '12px 10px',
+                        fontSize: '0.92rem',
+                        justifyContent: 'center',
+                        fontWeight: 700
+                      }}
                     >
-                      {size}×{size}
+                      {label}
                     </button>
                   ))}
                 </div>
-              </div>
 
-              {/* Card Deck Selector */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Layers size={16} /> Card Deck:
-                </span>
-                <select 
-                  className="input-field" 
-                  value={selectedDeck} 
-                  onChange={(e) => setSelectedDeck(e.target.value)}
-                  disabled={gameMode === 'friend' && !!roomId}
-                  style={{ width: 'auto', padding: '6px 12px', fontSize: '0.9rem', opacity: gameMode === 'friend' && !!roomId ? 0.6 : 1 }}
-                >
-                  {Object.entries(CARD_DECKS).map(([key, deck]) => (
-                    <option key={key} value={key}>{deck.name}</option>
-                  ))}
-                </select>
+                {/* Grid Size Selector */}
+                {gameMode !== 'friend' && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', borderTop: '1px solid rgba(0,0,0,0.08)', paddingTop: '12px' }}>
+                    <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Grid Size:</span>
+                    <div className="grid-toggle-bar">
+                      {[4, 6, 8].map(size => (
+                        <button 
+                          key={size}
+                          className={`grid-toggle-btn${gridSize === size ? ' active' : ''}`}
+                          onClick={() => setGridSize(size)}
+                        >
+                          {size}×{size}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Card Deck Selector */}
+                {gameMode !== 'friend' && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Layers size={16} /> Card Deck:
+                    </span>
+                    <select 
+                      className="input-field" 
+                      value={selectedDeck} 
+                      onChange={(e) => setSelectedDeck(e.target.value)}
+                      style={{ width: 'auto', padding: '6px 12px', fontSize: '0.9rem' }}
+                    >
+                      {Object.entries(CARD_DECKS).map(([key, deck]) => (
+                        <option key={key} value={key}>{deck.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
-            </div>
+            )}
 
             {/* Online Multiplayer Lobby Panel */}
             {gameMode === 'friend' && (
@@ -651,13 +656,15 @@ function App() {
                   </form>
                 ) : !roomId ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <button onClick={handleCreateRoom} disabled={isJoining} className="btn-primary" style={{ width: '100%', padding: '12px', fontSize: '0.95rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                    <button onClick={handleCreateRoom} disabled={isJoining || !playerName.trim()} className="btn-primary" style={{ width: '100%', padding: '12px', fontSize: '0.95rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                       {isJoining ? (
                         <>
                           <Loader2 size={18} className="anim-rotate" /> Creating Room...
                         </>
                       ) : (
-                        `Create Room (${gridSize}×${gridSize})`
+                        <>
+                          <PlusCircle size={18} /> Create Room
+                        </>
                       )}
                     </button>
                     
@@ -714,6 +721,51 @@ function App() {
                         )}
                       </button>
                     </div>
+
+                    {/* Room Settings (Host Only, Pre-game) */}
+                    {!gameState?.gameStarted && gameState?.hostId === socket?.id && (
+                      <div style={{ padding: '12px', background: 'rgba(0,0,0,0.02)', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '10px', border: '1px solid rgba(0,0,0,0.05)' }}>
+                        <h4 style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Room Settings (Host)</h4>
+                        
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.9rem', fontWeight: 700 }}>Grid Size:</span>
+                          <div className="grid-toggle-bar" style={{ background: 'var(--bg-secondary)', padding: '3px' }}>
+                            {[4, 6, 8].map(size => (
+                              <button 
+                                key={size}
+                                className={`grid-toggle-btn${gridSize === size ? ' active' : ''}`}
+                                onClick={() => {
+                                  setGridSize(size);
+                                  socket.emit('update-room-settings', { gridSize: size, deck: selectedDeck });
+                                }}
+                                style={{ padding: '4px 8px', fontSize: '0.85rem' }}
+                              >
+                                {size}×{size}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.9rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Layers size={14} /> Card Deck:
+                          </span>
+                          <select 
+                            className="input-field" 
+                            value={selectedDeck} 
+                            onChange={(e) => {
+                              setSelectedDeck(e.target.value);
+                              socket.emit('update-room-settings', { gridSize, deck: e.target.value });
+                            }}
+                            style={{ width: 'auto', padding: '4px 8px', fontSize: '0.85rem' }}
+                          >
+                            {Object.entries(CARD_DECKS).map(([key, deck]) => (
+                              <option key={key} value={key}>{deck.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Turn indicator */}
                     {gameState?.gameStarted && !gameState.winner && (

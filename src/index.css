@@ -137,7 +137,7 @@ p {
 /* Game Layout Grid Column Split */
 .game-container {
   display: grid;
-  grid-template-columns: 0.85fr 1.15fr; /* 42.5% left (controls), 57.5% right (grid) */
+  grid-template-columns: 0.65fr 1.35fr; /* Panel is roughly 0.7x and Grid is roughly 1.2x of original */
   gap: 28px;
   width: 100%;
   max-width: 1200px;
