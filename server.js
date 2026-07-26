@@ -478,14 +478,21 @@ io.on('connection', (socket) => {
         room.players[room.activePlayerIndex].score++;
         
         if (room.board.every(c => c.isMatched)) {
-          const p1Score = room.players[0]?.score || 0;
-          const p2Score = room.players[1]?.score || 0;
-          if (p1Score > p2Score) {
-            room.winner = room.players[0].name;
-            room.players[0].wins = (room.players[0].wins || 0) + 1;
-          } else if (p2Score > p1Score) {
-            room.winner = room.players[1].name;
-            room.players[1].wins = (room.players[1].wins || 0) + 1;
+          let maxScore = -1;
+          let winners = [];
+          
+          room.players.forEach(p => {
+            if (p.score > maxScore) {
+              maxScore = p.score;
+              winners = [p];
+            } else if (p.score === maxScore) {
+              winners.push(p);
+            }
+          });
+
+          if (winners.length === 1) {
+            room.winner = winners[0].name;
+            winners[0].wins = (winners[0].wins || 0) + 1;
           } else {
             room.winner = 'Tie';
           }
