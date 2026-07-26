@@ -295,6 +295,9 @@ function App() {
       setIsJoining(false);
       setIsVerifying(false);
       setErrorMsg(err);
+      if (err.includes('DB Update')) {
+        alert(err);
+      }
     });
 
     return () => {
