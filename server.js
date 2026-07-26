@@ -588,7 +588,7 @@ io.on('connection', (socket) => {
     broadcastGameState(roomId, room);
   });
 
-  // Explicit Leave (bypasses grace period)
+  // Explicit Leave (bypasses grace period for temp rooms)
   socket.on('explicit-leave', ({ sessionToken }) => {
     const roomId = socket.roomId;
     if (roomId && rooms.has(roomId)) {
@@ -596,23 +596,38 @@ io.on('connection', (socket) => {
       socket.roomId = null;
       
       const room = rooms.get(roomId);
-      room.players = room.players.filter(p => p.sessionToken !== sessionToken);
       
-      if (room.id !== 'M-0314' && (room.players.length === 0 || room.hostToken === sessionToken)) {
-        io.to(roomId).emit('room-closed');
-        rooms.delete(roomId);
-        console.log(`Room ${roomId} deleted (empty or host left explicitly)`);
+      if (room.isPermanent) {
+        // In permanent rooms, do not remove the player. Mark as disconnected.
+        const player = room.players.find(p => p.sessionToken === sessionToken);
+        if (player) {
+          player.isDisconnected = true;
+          if (player.disconnectTimeout) clearTimeout(player.disconnectTimeout);
+          
+          socket.broadcast.to(roomId).emit('player-disconnected', player.name);
+          broadcastGameState(roomId, room, socket);
+          
+          // Delete room if empty
+          const activePlayers = room.players.filter(p => !p.isDisconnected);
+          if (activePlayers.length === 0 && room.id !== 'M-0314') {
+             rooms.delete(roomId);
+             console.log(`Permanent Room ${roomId} deleted (all players disconnected)`);
+          }
+        }
       } else {
-        if (room.id === 'M-0314' && room.players.length === 0) {
-          room.gameStarted = false;
-          room.isWaiting = false;
-          room.winner = null;
+        room.players = room.players.filter(p => p.sessionToken !== sessionToken);
+        
+        if (room.players.length === 0 || room.hostToken === sessionToken) {
+          io.to(roomId).emit('room-closed');
+          rooms.delete(roomId);
+          console.log(`Room ${roomId} deleted (empty or host left explicitly)`);
+        } else {
+          if (room.activePlayerIndex >= room.players.length) {
+            room.activePlayerIndex = 0;
+          }
+          socket.broadcast.to(roomId).emit('player-left', 'A player explicitly left the room');
+          broadcastGameState(roomId, room, socket);
         }
-        if (room.activePlayerIndex >= room.players.length) {
-          room.activePlayerIndex = 0;
-        }
-        socket.broadcast.to(roomId).emit('player-left', 'A player explicitly left the room');
-        broadcastGameState(roomId, room, socket);
       }
     }
   });
@@ -628,24 +643,33 @@ io.on('connection', (socket) => {
       if (player) {
         player.isDisconnected = true;
         
-        // Start 60 second grace period
+        // Start 60 second grace period for temp rooms
         player.disconnectTimeout = setTimeout(() => {
           const currentRoom = rooms.get(roomId);
           if (!currentRoom) return;
           
-          currentRoom.players = currentRoom.players.filter(p => p.sessionToken !== player.sessionToken);
-          
-          // Delete room if empty OR if the host left (except for M-0314)
-          if (currentRoom.id !== 'M-0314' && (currentRoom.players.length === 0 || currentRoom.hostToken === player.sessionToken)) {
-            io.to(roomId).emit('room-closed');
-            rooms.delete(roomId);
-            console.log(`Room ${roomId} deleted (empty or host left)`);
+          if (currentRoom.isPermanent) {
+             // For permanent rooms, don't remove player, just check if room is empty
+             const activePlayers = currentRoom.players.filter(p => !p.isDisconnected);
+             if (activePlayers.length === 0 && currentRoom.id !== 'M-0314') {
+                rooms.delete(roomId);
+                console.log(`Permanent Room ${roomId} deleted (all players disconnected)`);
+             }
           } else {
-            if (currentRoom.activePlayerIndex >= currentRoom.players.length) {
-              currentRoom.activePlayerIndex = 0;
+            currentRoom.players = currentRoom.players.filter(p => p.sessionToken !== player.sessionToken);
+            
+            // Delete room if empty OR if the host left
+            if (currentRoom.players.length === 0 || currentRoom.hostToken === player.sessionToken) {
+              io.to(roomId).emit('room-closed');
+              rooms.delete(roomId);
+              console.log(`Room ${roomId} deleted after grace period`);
+            } else {
+              if (currentRoom.activePlayerIndex >= currentRoom.players.length) {
+                currentRoom.activePlayerIndex = 0;
+              }
+              io.to(roomId).emit('player-left', `${player.name} failed to reconnect`);
+              broadcastGameState(roomId, currentRoom);
             }
-            io.to(roomId).emit('player-left', 'A player left the room');
-            broadcastGameState(roomId, currentRoom);
           }
         }, 60000);
         
