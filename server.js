@@ -137,7 +137,7 @@ function buildBoardView(board) {
   }));
 }
 
-function broadcastGameState(roomId, room) {
+function broadcastGameState(roomId, room, excludeSocket = null) {
   const baseState = {
     id: room.id,
     players: room.players.map(p => ({ 
@@ -158,8 +158,12 @@ function broadcastGameState(roomId, room) {
     lifetimeScores: room.id === 'M-0314' ? lifetimeScores : undefined
   };
 
-  // Send identical state to all players in the room
-  io.to(roomId).emit('game-state', baseState);
+  // Send identical state to all players in the room  
+  if (excludeSocket) {
+    excludeSocket.broadcast.to(roomId).emit('game-state', baseState);
+  } else {
+    io.to(roomId).emit('game-state', baseState);
+  }
 }
 
 io.on('connection', (socket) => {
@@ -453,8 +457,8 @@ io.on('connection', (socket) => {
         if (room.activePlayerIndex >= room.players.length) {
           room.activePlayerIndex = 0;
         }
-        io.to(roomId).emit('player-left', 'A player explicitly left the room');
-        broadcastGameState(roomId, room);
+        socket.broadcast.to(roomId).emit('player-left', 'A player explicitly left the room');
+        broadcastGameState(roomId, room, socket);
       }
     }
   });
