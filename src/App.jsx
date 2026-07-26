@@ -919,19 +919,14 @@ function App() {
             {/* Clash Royale Style Monkey Emote Bar */}
             {gameMode === 'friend' && roomId && (
               <div className="emote-bar">
-                {['/emotes/emote_1.webp', '/emotes/emote_2.webp', '/emotes/emote_3.webp', '🐵', '😂', '🔥', '🏆', '👑'].map((emote) => (
+                {['🐵', '🙈', '🙉', '🙊', '🍌', '👑', '🔥', '🏆', '😂', '😎'].map((emoji) => (
                   <button
-                    key={emote}
+                    key={emoji}
                     className="emote-btn"
-                    onClick={() => handleSendEmote(emote)}
-                    title={`Send emote`}
-                    style={{ padding: emote.endsWith('.webp') ? '2px' : undefined }}
+                    onClick={() => handleSendEmote(emoji)}
+                    title={`Send ${emoji} emote`}
                   >
-                    {emote.endsWith('.webp') ? (
-                      <img src={emote} alt="emote" style={{ width: '28px', height: '28px', objectFit: 'contain', borderRadius: '4px' }} />
-                    ) : (
-                      emote
-                    )}
+                    {emoji}
                   </button>
                 ))}
               </div>
@@ -1032,12 +1027,8 @@ function App() {
       {activeEmotes.length > 0 && (
         <div className="emote-pop-container">
           {activeEmotes.map((e) => (
-            <div key={e.id} className="emote-bubble" style={{ padding: e.emote.endsWith('.webp') ? '4px' : undefined }}>
-              {e.emote.endsWith('.webp') ? (
-                <img src={e.emote} alt="emote" style={{ width: '48px', height: '48px', objectFit: 'contain', borderRadius: '6px', display: 'block' }} />
-              ) : (
-                e.emote
-              )}
+            <div key={e.id} className="emote-bubble">
+              {e.emote}
             </div>
           ))}
         </div>
