@@ -894,15 +894,18 @@ function App() {
                       </div>
                     )}
 
-                    {/* Lifetime Scoreboard for M-0314 */}
-                    {gameState?.id === 'M-0314' && gameState?.lifetimeScores && (
+                    {/* Lifetime Scoreboard for Permanent Rooms */}
+                    {gameState?.isPermanent && gameState?.lifetimeScores && (
                       <div style={{ background: 'linear-gradient(135deg, rgba(255,193,7,0.1) 0%, rgba(255,152,0,0.1) 100%)', border: '1px solid rgba(255,193,7,0.3)', padding: '12px', borderRadius: '12px', marginBottom: '8px' }}>
                         <div style={{ textAlign: 'center', fontSize: '0.85rem', fontWeight: 800, color: 'var(--accent-warning)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '10px' }}>
                           ⭐ Lifetime Scoreboard
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
-                          <span>Manya: <span style={{ color: 'var(--accent-warning)', fontSize: '1.1rem' }}>{gameState.lifetimeScores.Manya}</span></span>
-                          <span>Nitish: <span style={{ color: 'var(--accent-warning)', fontSize: '1.1rem' }}>{gameState.lifetimeScores.Nitish}</span></span>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '8px', fontWeight: 700, textAlign: 'center' }}>
+                          {Object.entries(gameState.lifetimeScores).map(([name, score]) => (
+                            <div key={name}>
+                              {name}: <span style={{ color: 'var(--accent-warning)', fontSize: '1.1rem' }}>{score}</span>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )}
