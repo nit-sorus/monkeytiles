@@ -166,6 +166,7 @@ function App() {
   const [errorMsg, setErrorMsg] = useState('');
   const [copied, setCopied] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
   const [showCreatePermanentModal, setShowCreatePermanentModal] = useState(false);
   const [showJoinPermanentModal, setShowJoinPermanentModal] = useState(false);
   const [customRoomId, setCustomRoomId] = useState('');
@@ -241,6 +242,7 @@ function App() {
     });
 
     newSocket.on('permanent-room-verified', ({ roomId, allowedPlayers }) => {
+      setIsVerifying(false);
       setPermanentAllowedPlayers(allowedPlayers);
       setJoinPermanentRoomId(roomId);
       setErrorMsg('');
@@ -291,6 +293,7 @@ function App() {
 
     newSocket.on('error-message', (err) => {
       setIsJoining(false);
+      setIsVerifying(false);
       setErrorMsg(err);
     });
 
@@ -601,13 +604,23 @@ function App() {
                 />
                 <button 
                   className="btn-primary" 
+                  disabled={isVerifying || !joinPermanentRoomId}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                   onClick={() => {
                     if (socket && joinPermanentRoomId) {
+                      setIsVerifying(true);
+                      setErrorMsg('');
                       socket.emit('verify-permanent-room', { roomId: joinPermanentRoomId });
                     }
                   }}
                 >
-                  Verify Room
+                  {isVerifying ? (
+                    <>
+                      <Loader2 size={16} className="anim-rotate" /> Verifying...
+                    </>
+                  ) : (
+                    'Verify Room'
+                  )}
                 </button>
               </div>
             ) : (

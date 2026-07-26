@@ -543,3 +543,10 @@ footer {
     opacity: 0;
   }
 }
+
+.anim-rotate {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  100% { transform: rotate(360deg); }
+}
