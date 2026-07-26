@@ -92,14 +92,18 @@ async function updateLifetimeScore(roomId, winnerName) {
     }
   } else if (permanentRoomsCollection) {
     try {
-      await permanentRoomsCollection.updateOne(
+      const updateResult = await permanentRoomsCollection.updateOne(
         { _id: roomId },
         { 
           $inc: { [`scores.${name}`]: 1 },
           $set: { lastActivityAt: new Date() }
         }
       );
-    } catch (err) { console.error('Failed to update permanent room score:', err); }
+      io.to(roomId).emit('error-message', `DB Update for ${roomId}: matched ${updateResult.matchedCount}, modified ${updateResult.modifiedCount}`);
+    } catch (err) { 
+      console.error('Failed to update permanent room score:', err); 
+      io.to(roomId).emit('error-message', `DB Error: ${err.message}`);
+    }
   }
 }
 
