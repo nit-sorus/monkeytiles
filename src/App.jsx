@@ -919,7 +919,7 @@ function App() {
             {/* Clash Royale Style Monkey Emote Bar */}
             {gameMode === 'friend' && roomId && (
               <div className="emote-bar">
-                {['/emotes/emote_1.webp', '/emotes/emote_2.webp', '/emotes/emote_3.webp', '🐵', '😂', '🔥', '🏆', '👑'].map((emote) => (
+                {['./emotes/emote_1.webp', './emotes/emote_2.webp', './emotes/emote_3.webp', '🐵', '😂', '🔥', '🏆', '👑'].map((emote) => (
                   <button
                     key={emote}
                     className="emote-btn"
