@@ -166,8 +166,12 @@ function App() {
   const [errorMsg, setErrorMsg] = useState('');
   const [copied, setCopied] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
-  const [showPermanentRoomModal, setShowPermanentRoomModal] = useState(false);
-
+  const [showCreatePermanentModal, setShowCreatePermanentModal] = useState(false);
+  const [showJoinPermanentModal, setShowJoinPermanentModal] = useState(false);
+  const [customRoomId, setCustomRoomId] = useState('');
+  const [customPlayerNames, setCustomPlayerNames] = useState(['', '', '', '']);
+  const [permanentAllowedPlayers, setPermanentAllowedPlayers] = useState([]);
+  const [joinPermanentRoomId, setJoinPermanentRoomId] = useState('');
   // Clash Royale Style Emote Overlay State
   const [activeEmotes, setActiveEmotes] = useState([]);
 
@@ -227,6 +231,19 @@ function App() {
       setErrorMsg('');
       const newUrl = `${window.location.origin}${window.location.pathname}?room=${createdRoomId}`;
       window.history.pushState({ path: newUrl }, '', newUrl);
+    });
+
+    newSocket.on('permanent-room-created', (createdRoomId) => {
+      setJoinPermanentRoomId(createdRoomId);
+      setShowCreatePermanentModal(false);
+      setShowJoinPermanentModal(true);
+      newSocket.emit('verify-permanent-room', { roomId: createdRoomId });
+    });
+
+    newSocket.on('permanent-room-verified', ({ roomId, allowedPlayers }) => {
+      setPermanentAllowedPlayers(allowedPlayers);
+      setJoinPermanentRoomId(roomId);
+      setErrorMsg('');
     });
 
     newSocket.on('room-closed', (msg) => {
@@ -441,11 +458,6 @@ function App() {
       cleanCode = 'M-' + cleanCode;
     }
 
-    if (cleanCode === 'M-0314') {
-      setShowPermanentRoomModal(true);
-      return;
-    }
-
     executeJoinRoom(cleanCode, playerName);
   };
 
@@ -524,40 +536,110 @@ function App() {
         </a>
       </header>
 
-      {/* Permanent Room 0314 Modal */}
-      {showPermanentRoomModal && (
+      {/* Create Permanent Room Modal */}
+      {showCreatePermanentModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '400px', padding: '30px', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <h2 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 800 }}>Create Permanent Room</h2>
+            <input
+              type="text"
+              className="input-field"
+              placeholder="Unique Room ID (e.g. M-FAMILY)"
+              value={customRoomId}
+              onChange={(e) => setCustomRoomId(e.target.value)}
+              required
+            />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              {customPlayerNames.map((name, i) => (
+                <input
+                  key={i}
+                  type="text"
+                  className="input-field"
+                  placeholder={`Player ${i+1} Name`}
+                  value={name}
+                  onChange={(e) => {
+                    const newNames = [...customPlayerNames];
+                    newNames[i] = e.target.value;
+                    setCustomPlayerNames(newNames);
+                  }}
+                />
+              ))}
+            </div>
+            <button 
+              className="btn-primary" 
+              onClick={() => {
+                const validNames = customPlayerNames.filter(n => n.trim() !== '');
+                if (validNames.length < 2) return setErrorMsg('Need at least 2 players');
+                if (!customRoomId.trim()) return setErrorMsg('Room ID required');
+                if (socket) {
+                  socket.emit('create-permanent-room', { roomId: customRoomId, playerNames: validNames });
+                }
+              }}
+            >
+              Create Room
+            </button>
+            <button className="btn-secondary" onClick={() => setShowCreatePermanentModal(false)}>Cancel</button>
+            {errorMsg && <div style={{ color: 'var(--accent-danger)' }}>{errorMsg}</div>}
+          </div>
+        </div>
+      )}
+
+      {/* Join Permanent Room Modal */}
+      {showJoinPermanentModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div className="glass-panel" style={{ width: '100%', maxWidth: '400px', padding: '30px', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <h2 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 800 }}>Welcome to 0314</h2>
-            <p style={{ margin: 0, color: 'var(--text-secondary)' }}>Who are you?</p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <button 
-                className="btn-primary" 
-                onClick={() => {
-                  setPlayerName('Manya');
-                  localStorage.setItem('memory_playerName', 'Manya');
-                  setShowPermanentRoomModal(false);
-                  executeJoinRoom('M-0314', 'Manya');
-                }}
-              >
-                Manya
-              </button>
-              <button 
-                className="btn-primary" 
-                onClick={() => {
-                  setPlayerName('Nitish');
-                  localStorage.setItem('memory_playerName', 'Nitish');
-                  setShowPermanentRoomModal(false);
-                  executeJoinRoom('M-0314', 'Nitish');
-                }}
-                style={{ background: 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%)' }}
-              >
-                Nitish
-              </button>
-            </div>
-            <button className="btn-secondary" onClick={() => setShowPermanentRoomModal(false)} style={{ marginTop: '10px' }}>
-              Cancel
+            <h2 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 800 }}>Join Permanent Room</h2>
+            
+            {permanentAllowedPlayers.length === 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="Enter Room ID"
+                  value={joinPermanentRoomId}
+                  onChange={(e) => setJoinPermanentRoomId(e.target.value)}
+                />
+                <button 
+                  className="btn-primary" 
+                  onClick={() => {
+                    if (socket && joinPermanentRoomId) {
+                      socket.emit('verify-permanent-room', { roomId: joinPermanentRoomId });
+                    }
+                  }}
+                >
+                  Verify Room
+                </button>
+              </div>
+            ) : (
+              <>
+                <p style={{ margin: 0, color: 'var(--text-secondary)' }}>Welcome to {joinPermanentRoomId}! Who are you?</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  {permanentAllowedPlayers.map((name, idx) => (
+                    <button 
+                      key={name}
+                      className="btn-primary" 
+                      onClick={() => {
+                        setPlayerName(name);
+                        localStorage.setItem('memory_playerName', name);
+                        setShowJoinPermanentModal(false);
+                        executeJoinRoom(joinPermanentRoomId, name);
+                      }}
+                      style={idx % 2 !== 0 ? { background: 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%)' } : {}}
+                    >
+                      {name}
+                    </button>
+                  ))}
+                </div>
+                <button className="btn-secondary" onClick={() => setPermanentAllowedPlayers([])} style={{ marginTop: '10px' }}>
+                  Back
+                </button>
+              </>
+            )}
+            
+            <button className="btn-secondary" onClick={() => { setShowJoinPermanentModal(false); setPermanentAllowedPlayers([]); }} style={{ marginTop: '10px' }}>
+              Close
             </button>
+            {errorMsg && <div style={{ color: 'var(--accent-danger)' }}>{errorMsg}</div>}
           </div>
         </div>
       )}
@@ -698,10 +780,23 @@ function App() {
                     </form>
 
                     {errorMsg && (
-                      <div style={{ padding: '8px 10px', background: 'rgba(235, 87, 87, 0.12)', border: '1px solid var(--accent-danger)', borderRadius: '8px', fontSize: '0.82rem', color: 'var(--accent-danger)', fontWeight: 700, textAlign: 'center' }}>
-                        ❌ {errorMsg}
+                      <div style={{ color: 'var(--accent-danger)', fontSize: '0.85rem', textAlign: 'center', fontWeight: 600 }}>
+                        {errorMsg}
                       </div>
                     )}
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
+                      <hr style={{ flex: 1, border: 'none', borderBottom: '1px solid var(--border-color)' }} />
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>PERMANENT ROOMS</span>
+                      <hr style={{ flex: 1, border: 'none', borderBottom: '1px solid var(--border-color)' }} />
+                    </div>
+
+                    <button onClick={() => setShowJoinPermanentModal(true)} className="btn-primary" style={{ width: '100%', padding: '10px', fontSize: '0.9rem', background: 'var(--accent-secondary)' }}>
+                      Join Permanent Room
+                    </button>
+                    <button onClick={() => setShowCreatePermanentModal(true)} className="btn-secondary" style={{ width: '100%', padding: '10px', fontSize: '0.9rem' }}>
+                      Create Permanent Room
+                    </button>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>

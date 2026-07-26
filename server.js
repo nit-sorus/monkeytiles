@@ -36,10 +36,11 @@ app.use((req, res, next) => {
 // Game state storage
 const rooms = new Map();
 
-// MongoDB Setup for Persistent Scores
+// MongoDB Setup for Persistent Scores & Permanent Rooms
 const mongoUri = process.env.MONGODB_URI;
 let db = null;
 let scoresCollection = null;
+let permanentRoomsCollection = null;
 let lifetimeScores = { Manya: 0, Nitish: 0 }; 
 
 if (mongoUri) {
@@ -48,6 +49,10 @@ if (mongoUri) {
     console.log('Connected to MongoDB');
     db = client.db('monkeytiles');
     scoresCollection = db.collection('scores');
+    permanentRoomsCollection = db.collection('permanentRooms');
+    
+    // Auto-delete permanent rooms after 30 days of inactivity (2592000 seconds)
+    permanentRoomsCollection.createIndex({ "lastActivityAt": 1 }, { expireAfterSeconds: 2592000 }).catch(err => console.error('Index err:', err));
     
     scoresCollection.findOne({ _id: 'room_0314_lifetime' }).then(doc => {
       if (doc) {
@@ -62,26 +67,39 @@ if (mongoUri) {
   });
 }
 
-async function updateLifetimeScore(winnerName) {
+async function updateLifetimeScore(roomId, winnerName) {
   if (!winnerName) return;
-  const name = winnerName.toLowerCase();
-  let key = null;
-  if (name.includes('nitish')) key = 'Nitish';
-  if (name.includes('manya')) key = 'Manya';
-  if (!key) return;
+  const room = rooms.get(roomId);
+  if (!room || !room.isPermanent) return;
 
-  lifetimeScores[key] += 1;
+  const name = winnerName.trim();
   
-  if (scoresCollection) {
-    try {
-      await scoresCollection.updateOne(
-        { _id: 'room_0314_lifetime' },
-        { $inc: { [key]: 1 } },
-        { upsert: true }
-      );
-    } catch (err) {
-      console.error('Failed to update score:', err);
+  // Update in memory
+  if (!room.lifetimeScores) room.lifetimeScores = {};
+  if (room.lifetimeScores[name] === undefined) room.lifetimeScores[name] = 0;
+  room.lifetimeScores[name] += 1;
+  
+  // Update in MongoDB
+  if (roomId === 'M-0314') {
+    if (scoresCollection) {
+      try {
+        await scoresCollection.updateOne(
+          { _id: 'room_0314_lifetime' },
+          { $inc: { [name]: 1 } },
+          { upsert: true }
+        );
+      } catch (err) { console.error('Failed to update M-0314 score:', err); }
     }
+  } else if (permanentRoomsCollection) {
+    try {
+      await permanentRoomsCollection.updateOne(
+        { _id: roomId },
+        { 
+          $inc: { [`scores.${name}`]: 1 },
+          $set: { lastActivityAt: new Date() }
+        }
+      );
+    } catch (err) { console.error('Failed to update permanent room score:', err); }
   }
 }
 
@@ -97,7 +115,10 @@ rooms.set('M-0314', {
   activePlayerIndex: 0,
   gameStarted: false,
   isWaiting: false,
-  winner: null
+  winner: null,
+  isPermanent: true,
+  allowedPlayers: ['Nitish', 'Manya'],
+  lifetimeScores: lifetimeScores
 });
 
 // Card Decks (synchronized with frontend)
@@ -155,7 +176,9 @@ function broadcastGameState(roomId, room, excludeSocket = null) {
     deck: room.deck,
     hostId: room.players[0] ? room.players[0].id : null,
     board: buildBoardView(room.board),
-    lifetimeScores: room.id === 'M-0314' ? lifetimeScores : undefined
+    lifetimeScores: room.lifetimeScores,
+    allowedPlayers: room.allowedPlayers,
+    isPermanent: room.isPermanent
   };
 
   // Send identical state to all players in the room  
@@ -169,7 +192,57 @@ function broadcastGameState(roomId, room, excludeSocket = null) {
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
 
-  // Create a Room
+  // Create a Custom Permanent Room
+  socket.on('create-permanent-room', async ({ roomId, playerNames }) => {
+    let cleanCode = (roomId || '').trim().toUpperCase();
+    if (!cleanCode) return socket.emit('error-message', 'Room ID cannot be empty');
+    
+    if (rooms.has(cleanCode)) return socket.emit('error-message', 'Room ID is already active');
+    
+    if (permanentRoomsCollection) {
+      const existing = await permanentRoomsCollection.findOne({ _id: cleanCode });
+      if (existing) return socket.emit('error-message', 'Room ID already taken in the database');
+      
+      const scores = {};
+      playerNames.forEach(n => scores[n] = 0);
+      
+      const newRoomDoc = {
+        _id: cleanCode,
+        allowedPlayers: playerNames,
+        scores,
+        lastActivityAt: new Date()
+      };
+      
+      try {
+        await permanentRoomsCollection.insertOne(newRoomDoc);
+      } catch (err) {
+        console.error('Failed to create permanent room:', err);
+        return socket.emit('error-message', 'Database error creating room');
+      }
+    }
+    
+    socket.emit('permanent-room-created', cleanCode);
+    console.log(`Permanent room created: ${cleanCode} with players: ${playerNames}`);
+  });
+
+  // Verify Permanent Room for Joining
+  socket.on('verify-permanent-room', async ({ roomId }) => {
+    let cleanCode = (roomId || '').trim().toUpperCase();
+    
+    if (permanentRoomsCollection) {
+      const doc = await permanentRoomsCollection.findOne({ _id: cleanCode });
+      if (doc) {
+        return socket.emit('permanent-room-verified', { roomId: cleanCode, allowedPlayers: doc.allowedPlayers });
+      }
+    }
+    
+    if (cleanCode === 'M-0314') {
+       return socket.emit('permanent-room-verified', { roomId: cleanCode, allowedPlayers: ['Nitish', 'Manya'] });
+    }
+    socket.emit('error-message', 'Room not found. Make sure the ID is correct.');
+  });
+
+  // Create a Room (Standard Temporary)
   socket.on('create-room', ({ playerName, gridSize, sessionToken, deck }) => {
     const roomId = `M-${Math.floor(1000 + Math.random() * 9000)}`;
     const size = parseInt(gridSize) || 6;
@@ -205,39 +278,102 @@ io.on('connection', (socket) => {
   });
 
   // Join a Room (supports up to 4 players)
-  socket.on('join-room', ({ roomId, playerName, sessionToken }) => {
+  socket.on('join-room', async ({ roomId, playerName, sessionToken }) => {
     let cleanCode = (roomId || '').trim().toUpperCase();
     if (!cleanCode.startsWith('M-') && /^\d{4}$/.test(cleanCode)) {
       cleanCode = 'M-' + cleanCode;
     }
 
-    const room = rooms.get(cleanCode);
+    let room = rooms.get(cleanCode);
+    
+    if (!room && permanentRoomsCollection) {
+      const doc = await permanentRoomsCollection.findOne({ _id: cleanCode });
+      if (doc) {
+        room = {
+          id: cleanCode,
+          hostToken: 'PERMANENT',
+          lastActivityAt: Date.now(),
+          players: [],
+          board: [],
+          gridSize: 6,
+          deck: 'animals',
+          firstFlippedIndex: null,
+          activePlayerIndex: 0,
+          gameStarted: false,
+          isWaiting: false,
+          winner: null,
+          isPermanent: true,
+          allowedPlayers: doc.allowedPlayers,
+          lifetimeScores: doc.scores || {}
+        };
+        rooms.set(cleanCode, room);
+      }
+    }
+
+    if (!room && cleanCode === 'M-0314') {
+        room = {
+          id: 'M-0314',
+          hostToken: 'PERMANENT',
+          lastActivityAt: Date.now(),
+          players: [],
+          board: [],
+          gridSize: 6,
+          deck: 'animals',
+          firstFlippedIndex: null,
+          activePlayerIndex: 0,
+          gameStarted: false,
+          isWaiting: false,
+          winner: null,
+          isPermanent: true,
+          allowedPlayers: ['Nitish', 'Manya'],
+          lifetimeScores: lifetimeScores
+        };
+        rooms.set(cleanCode, room);
+    }
+
     if (!room) {
       socket.emit('error-message', 'Invalid room code. Please check the code and try again.');
       return;
     }
 
-    if (room.players.length >= 4) {
-      socket.emit('error-message', 'Room is full (max 4 players)');
-      return;
+    if (room.isPermanent) {
+      if (!room.allowedPlayers.includes(playerName)) {
+        return socket.emit('error-message', 'You are not an allowed player for this room.');
+      }
+      if (room.players.find(p => p.name === playerName && !p.isDisconnected)) {
+        return socket.emit('error-message', `Player ${playerName} is already active in the room!`);
+      }
+    } else {
+      if (room.players.length >= 4) {
+        return socket.emit('error-message', 'Room is full (max 4 players)');
+      }
     }
 
     if (room.gameStarted) {
-      socket.emit('error-message', 'Game is already in progress');
-      return;
+      return socket.emit('error-message', 'Game is already in progress');
     }
 
-    // Update room activity
     room.lastActivityAt = Date.now();
 
-    room.players.push({
-      id: socket.id,
-      sessionToken,
-      name: playerName || `Player ${room.players.length + 1}`,
-      score: 0,
-      wins: 0,
-      isDisconnected: false
-    });
+    let existingPlayer = room.players.find(p => p.name === playerName);
+    if (existingPlayer) {
+       if (existingPlayer.disconnectTimeout) {
+         clearTimeout(existingPlayer.disconnectTimeout);
+         existingPlayer.disconnectTimeout = null;
+       }
+       existingPlayer.id = socket.id;
+       existingPlayer.sessionToken = sessionToken;
+       existingPlayer.isDisconnected = false;
+    } else {
+       room.players.push({
+         id: socket.id,
+         sessionToken,
+         name: playerName || `Player ${room.players.length + 1}`,
+         score: 0,
+         wins: 0,
+         isDisconnected: false
+       });
+    }
 
     socket.join(cleanCode);
     socket.roomId = cleanCode;
@@ -283,9 +419,16 @@ io.on('connection', (socket) => {
     
     room.lastActivityAt = Date.now();
 
-    if (room.players.length < 2) {
-      socket.emit('error-message', 'Need at least 2 players to start!');
-      return;
+    if (room.isPermanent) {
+       if (room.players.length < room.allowedPlayers.length) {
+         socket.emit('error-message', `Need all ${room.allowedPlayers.length} players to start!`);
+         return;
+       }
+    } else {
+       if (room.players.length < 2) {
+         socket.emit('error-message', 'Need at least 2 players to start!');
+         return;
+       }
     }
 
     // Reset scores for all players
