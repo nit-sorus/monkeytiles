@@ -567,7 +567,7 @@ function App() {
         <div className="game-container">
           
           {/* Left Column: Options, Controls & Scoring */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+          <div className="left-control-panel">
             
             {/* Game Modes Panel */}
             {gameMode !== 'friend' && (

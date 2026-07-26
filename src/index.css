@@ -158,6 +158,39 @@ p {
   }
 }
 
+/* Left Control Panel (Scrolling on short screens) */
+.left-control-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+@media (min-width: 769px) {
+  .left-control-panel {
+    max-height: 85vh;
+    overflow-y: auto;
+    padding-right: 8px; /* space for scrollbar */
+    /* custom minimalist scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.2) transparent;
+  }
+  
+  .left-control-panel::-webkit-scrollbar {
+    width: 6px;
+  }
+  .left-control-panel::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .left-control-panel::-webkit-scrollbar-thumb {
+    background-color: rgba(255,255,255,0.2);
+    border-radius: 10px;
+  }
+  .left-control-panel:hover::-webkit-scrollbar-thumb {
+    background-color: rgba(255,255,255,0.4);
+  }
+}
+
 /* Card Grid Styles */
 .game-grid {
   display: grid;
