@@ -491,9 +491,9 @@ io.on('connection', (socket) => {
           }
           room.gameStarted = false;
           
-          // Permanent Room 0314 Logic
-          if (room.id === 'M-0314' && room.winner !== 'Tie') {
-            updateLifetimeScore(room.winner).then(() => {
+          // Permanent Room Logic
+          if (room.isPermanent && room.winner !== 'Tie') {
+            updateLifetimeScore(roomId, room.winner).then(() => {
               broadcastGameState(roomId, room);
             });
           } else {
