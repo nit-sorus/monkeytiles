@@ -158,23 +158,6 @@ p {
   }
 }
 
-/* Vertical Scaling / Demagnification for shorter desktop screens */
-@media (min-width: 769px) and (max-height: 920px) {
-  .game-container { zoom: 0.92; }
-}
-@media (min-width: 769px) and (max-height: 840px) {
-  .game-container { zoom: 0.85; }
-}
-@media (min-width: 769px) and (max-height: 780px) {
-  .game-container { zoom: 0.78; }
-}
-@media (min-width: 769px) and (max-height: 700px) {
-  .game-container { zoom: 0.70; }
-}
-@media (min-width: 769px) and (max-height: 620px) {
-  .game-container { zoom: 0.62; }
-}
-
 /* Card Grid Styles */
 .game-grid {
   display: grid;
