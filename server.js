@@ -588,7 +588,7 @@ io.on('connection', (socket) => {
     broadcastGameState(roomId, room);
   });
 
-  // Explicit Leave (bypasses grace period for temp rooms)
+  // Explicit Leave (bypasses grace period)
   socket.on('explicit-leave', ({ sessionToken }) => {
     const roomId = socket.roomId;
     if (roomId && rooms.has(roomId)) {
@@ -596,38 +596,24 @@ io.on('connection', (socket) => {
       socket.roomId = null;
       
       const room = rooms.get(roomId);
+      room.players = room.players.filter(p => p.sessionToken !== sessionToken);
       
-      if (room.isPermanent) {
-        // In permanent rooms, do not remove the player. Mark as disconnected.
-        const player = room.players.find(p => p.sessionToken === sessionToken);
-        if (player) {
-          player.isDisconnected = true;
-          if (player.disconnectTimeout) clearTimeout(player.disconnectTimeout);
-          
-          socket.broadcast.to(roomId).emit('player-disconnected', player.name);
-          broadcastGameState(roomId, room, socket);
-          
-          // Delete room if empty
-          const activePlayers = room.players.filter(p => !p.isDisconnected);
-          if (activePlayers.length === 0 && room.id !== 'M-0314') {
-             rooms.delete(roomId);
-             console.log(`Permanent Room ${roomId} deleted (all players disconnected)`);
-          }
-        }
+      // Delete room if empty OR if the host left (and it's not a permanent room)
+      if (room.players.length === 0 || (!room.isPermanent && room.hostToken === sessionToken)) {
+        io.to(roomId).emit('room-closed');
+        rooms.delete(roomId);
+        console.log(`Room ${roomId} deleted (empty or host left explicitly)`);
       } else {
-        room.players = room.players.filter(p => p.sessionToken !== sessionToken);
+        // Unconditionally end the game and return to lobby for remaining players
+        room.gameStarted = false;
+        room.isWaiting = false;
+        room.winner = null;
         
-        if (room.players.length === 0 || room.hostToken === sessionToken) {
-          io.to(roomId).emit('room-closed');
-          rooms.delete(roomId);
-          console.log(`Room ${roomId} deleted (empty or host left explicitly)`);
-        } else {
-          if (room.activePlayerIndex >= room.players.length) {
-            room.activePlayerIndex = 0;
-          }
-          socket.broadcast.to(roomId).emit('player-left', 'A player explicitly left the room');
-          broadcastGameState(roomId, room, socket);
+        if (room.activePlayerIndex >= room.players.length) {
+          room.activePlayerIndex = 0;
         }
+        socket.broadcast.to(roomId).emit('player-left', 'A player explicitly left the room');
+        broadcastGameState(roomId, room, socket);
       }
     }
   });
