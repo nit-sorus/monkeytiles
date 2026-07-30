@@ -194,7 +194,7 @@ p {
 /* Card Grid Styles */
 .game-grid {
   display: grid;
-  gap: 8px;
+  gap: clamp(3px, 1.5vw, 8px);
   width: 100%;
   margin: 0 auto;
 }
@@ -203,20 +203,32 @@ p {
 .grid-4 {
   grid-template-columns: repeat(4, 1fr);
   max-width: min(380px, 70vh);
+  --tile-perspective: 1200px;
 }
+.grid-4 .tile-inner {
+  transition: transform 0.45s cubic-bezier(0.35, 0.9, 0.35, 1);
+}
+
 .grid-6 {
   grid-template-columns: repeat(6, 1fr);
   max-width: min(530px, 75vh);
+  --tile-perspective: 600px;
 }
+
 .grid-8 {
   grid-template-columns: repeat(8, 1fr);
   max-width: min(690px, 80vh);
+  gap: clamp(3px, 1.2vw, 8px);
+  --tile-perspective: 400px;
+}
+.grid-8 .tile-inner {
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 
 /* 3D Tile Card Styles - Translucent Glass Boxes that Merge with Background */
 .tile-card {
   aspect-ratio: 1;
-  perspective: 600px;
+  perspective: var(--tile-perspective, 600px);
   cursor: pointer;
   position: relative;
   border-radius: 8px;
@@ -231,6 +243,8 @@ p {
   -webkit-transform-style: preserve-3d;
   transform-style: preserve-3d;
   border-radius: inherit;
+  will-change: transform;
+  -webkit-backface-visibility: hidden;
 }
 
 .tile-card.flipped .tile-inner {
@@ -553,19 +567,23 @@ footer {
 
 /* Responsive adjustments for mobile screens */
 @media (max-width: 600px) {
+  .game-grid {
+    gap: clamp(3px, 1.5vw, 6px);
+  }
+
   /* Smaller font sizes for denser grids on mobile so emojis don't overflow */
   .grid-6 .tile-back {
-    font-size: 2.2rem;
+    font-size: clamp(1.4rem, 6vw, 3.2rem);
   }
   .grid-6 .tile-watermark {
-    font-size: 1.4rem;
+    font-size: clamp(1.0rem, 4vw, 1.8rem);
   }
   
   .grid-8 .tile-back {
-    font-size: 1.6rem;
+    font-size: clamp(1.0rem, 4.5vw, 2.5rem);
   }
   .grid-8 .tile-watermark {
-    font-size: 1.0rem;
+    font-size: clamp(0.8rem, 3.5vw, 1.8rem);
   }
   
   /* Slightly adjust for grid-4 */
