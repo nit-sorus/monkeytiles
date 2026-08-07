@@ -208,8 +208,12 @@ p {
 .grid-4 .tile-inner {
   transition: transform 0.45s cubic-bezier(0.35, 0.9, 0.35, 1);
 }
+/* 4 columns: tile ≈ vw/4. Keep emoji at ~55% of tile width */
 .grid-4 .tile-back {
-  font-size: clamp(2.2rem, 8vw, 3.2rem);
+  font-size: clamp(1.6rem, 11vw, 3.2rem);
+}
+.grid-4 .tile-watermark {
+  font-size: clamp(1.2rem, 8vw, 2.2rem);
 }
 
 .grid-6 {
@@ -217,11 +221,12 @@ p {
   max-width: min(530px, 75vh);
   --tile-perspective: 600px;
 }
+/* 6 columns: tile ≈ vw/6. Keep emoji at ~55% of tile width */
 .grid-6 .tile-back {
-  font-size: clamp(1.4rem, 6vw, 3.2rem);
+  font-size: clamp(1.2rem, 7.5vw, 3.2rem);
 }
 .grid-6 .tile-watermark {
-  font-size: clamp(1.0rem, 4vw, 1.8rem);
+  font-size: clamp(0.9rem, 5.5vw, 1.8rem);
 }
 
 .grid-8 {
@@ -233,11 +238,12 @@ p {
 .grid-8 .tile-inner {
   transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
+/* 8 columns: tile ≈ vw/8. Keep emoji at ~55% of tile width */
 .grid-8 .tile-back {
-  font-size: clamp(1.0rem, 4.5vw, 2.5rem);
+  font-size: clamp(0.8rem, 5.5vw, 2.5rem);
 }
 .grid-8 .tile-watermark {
-  font-size: clamp(0.8rem, 3.5vw, 1.8rem);
+  font-size: clamp(0.6rem, 4vw, 1.6rem);
 }
 
 /* 3D Tile Card Styles - Translucent Glass Boxes that Merge with Background */
@@ -305,11 +311,13 @@ p {
 
 /* Monkey logo watermark on unflipped tile front */
 .tile-watermark {
-  font-size: 1.8rem;
+  /* Base size - overridden per grid class above */
+  font-size: clamp(0.6rem, 4vw, 1.8rem);
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
   pointer-events: none;
   user-select: none;
   opacity: 0.85;
+  line-height: 1;
 }
 
 /* Back side (Flipped / Showing Symbol) */
@@ -320,9 +328,12 @@ p {
   box-shadow: 0 4px 14px rgba(0, 168, 132, 0.2);
   -webkit-transform: rotateY(180deg);
   transform: rotateY(180deg);
-  font-size: 3.2rem;
+  /* Base size - overridden per grid class above */
+  font-size: clamp(0.8rem, 5.5vw, 3.2rem);
   user-select: none;
   position: relative;
+  overflow: hidden;
+  line-height: 1;
 }
 
 /* Main Buttons styling */
