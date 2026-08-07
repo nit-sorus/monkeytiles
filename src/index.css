@@ -299,7 +299,7 @@ p {
 
 /* Monkey logo watermark on unflipped tile front */
 .tile-watermark {
-  font-size: 27cqi;
+  font-size: 60cqi;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
   pointer-events: none;
   user-select: none;
@@ -315,7 +315,7 @@ p {
   box-shadow: 0 4px 14px rgba(0, 168, 132, 0.2);
   -webkit-transform: rotateY(180deg);
   transform: rotateY(180deg);
-  font-size: 37cqi;
+  font-size: 82cqi;
   user-select: none;
   position: relative;
   overflow: hidden;
