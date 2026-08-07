@@ -203,56 +203,44 @@ p {
 .grid-4 {
   grid-template-columns: repeat(4, 1fr);
   max-width: min(380px, 70vh);
-  --tile-perspective: 1200px;
+}
+.grid-4 .tile-card {
+  perspective: 1000px;
 }
 .grid-4 .tile-inner {
-  transition: transform 0.45s cubic-bezier(0.35, 0.9, 0.35, 1);
-}
-/* 4 columns: tile ≈ vw/4. Keep emoji at ~55% of tile width */
-.grid-4 .tile-back {
-  font-size: clamp(1.6rem, 11vw, 3.2rem);
-}
-.grid-4 .tile-watermark {
-  font-size: clamp(1.2rem, 8vw, 2.2rem);
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .grid-6 {
   grid-template-columns: repeat(6, 1fr);
   max-width: min(530px, 75vh);
-  --tile-perspective: 600px;
 }
-/* 6 columns: tile ≈ vw/6. Keep emoji at ~55% of tile width */
-.grid-6 .tile-back {
-  font-size: clamp(1.2rem, 7.5vw, 3.2rem);
+.grid-6 .tile-card {
+  perspective: 600px;
 }
-.grid-6 .tile-watermark {
-  font-size: clamp(0.9rem, 5.5vw, 1.8rem);
+.grid-6 .tile-inner {
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .grid-8 {
   grid-template-columns: repeat(8, 1fr);
   max-width: min(690px, 80vh);
   gap: clamp(3px, 1.2vw, 8px);
-  --tile-perspective: 400px;
+}
+.grid-8 .tile-card {
+  perspective: 400px;
 }
 .grid-8 .tile-inner {
-  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
-}
-/* 8 columns: tile ≈ vw/8. Keep emoji at ~55% of tile width */
-.grid-8 .tile-back {
-  font-size: clamp(0.8rem, 5.5vw, 2.5rem);
-}
-.grid-8 .tile-watermark {
-  font-size: clamp(0.6rem, 4vw, 1.6rem);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* 3D Tile Card Styles - Translucent Glass Boxes that Merge with Background */
 .tile-card {
   aspect-ratio: 1;
-  perspective: var(--tile-perspective, 600px);
   cursor: pointer;
   position: relative;
   border-radius: 8px;
+  container-type: inline-size;
 }
 
 .tile-inner {
@@ -311,8 +299,7 @@ p {
 
 /* Monkey logo watermark on unflipped tile front */
 .tile-watermark {
-  /* Base size - overridden per grid class above */
-  font-size: clamp(0.6rem, 4vw, 1.8rem);
+  font-size: 40cqi;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
   pointer-events: none;
   user-select: none;
@@ -328,8 +315,7 @@ p {
   box-shadow: 0 4px 14px rgba(0, 168, 132, 0.2);
   -webkit-transform: rotateY(180deg);
   transform: rotateY(180deg);
-  /* Base size - overridden per grid class above */
-  font-size: clamp(0.8rem, 5.5vw, 3.2rem);
+  font-size: 55cqi;
   user-select: none;
   position: relative;
   overflow: hidden;
