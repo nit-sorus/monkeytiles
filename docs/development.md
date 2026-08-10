@@ -73,7 +73,6 @@ Supported environment variables:
 | ------------- | -------- | ------------------------------------------------- |
 | `PORT`        | No       | Backend port (defaults to `3001`)                 |
 | `MONGODB_URI` | No       | MongoDB connection for permanent rooms and scores |
-| `NODE_ENV`    | No       | Runtime environment                               |
 
 Never commit `.env` or database credentials.
 

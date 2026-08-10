@@ -147,7 +147,7 @@ Database credentials should never be committed to Git. Store them in an ignored 
 
 ## Deployment
 
-The frontend is deployed with GitHub Pages, while the backend runs on Render. In production, the React client connects to `https://monkeytiles.onrender.com`.
+The frontend is deployed with GitHub Pages at `https://nit-sorus.github.io/monkeytiles/`, while the backend runs on Render. In production, the React client connects to `https://monkeytiles.onrender.com`.
 
 ## Current limitations
 

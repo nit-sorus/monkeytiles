@@ -2,7 +2,7 @@
 
 Monkeytiles is a browser-based memory card game built with React, Node.js, Express, Socket.IO, and MongoDB. It supports solo play and real-time multiplayer with synchronized turns, scoring, emotes, and player reconnection.
 
-**Live demo:** https://monkeytiles.js.org
+**Live demo:** [https://nit-sorus.github.io/monkeytiles/](https://nit-sorus.github.io/monkeytiles/)
 
 ## Features
 
@@ -10,7 +10,7 @@ Monkeytiles is a browser-based memory card game built with React, Node.js, Expre
 * Up to four players per room
 * 4×4, 6×6, and 8×8 boards
 * Multiple card decks
-* Server-authoritative multiplayer logic
+* Server-synchronized multiplayer game state
 * Temporary and permanent rooms
 * Lifetime scores for permanent rooms (MongoDB)
 * Player reconnection support
@@ -60,7 +60,6 @@ For full setup instructions, see [docs/development.md](docs/development.md).
 | ------------- | -------------------------------------- |
 | `PORT`        | Backend port (default: `3001`)         |
 | `MONGODB_URI` | MongoDB connection for permanent rooms |
-| `NODE_ENV`    | Runtime environment                    |
 
 Never commit `.env` or database credentials.
 

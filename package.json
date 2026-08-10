@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "homepage": "https://monkeytiles.js.org",
+  "homepage": "https://nit-sorus.github.io/monkeytiles/",
   "scripts": {
     "client": "vite",
     "server": "node server.js",
