@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "homepage": "https://monkeytiles.js.org",
+  "homepage": "https://nit-sorus.github.io/monkeytiles/",
   "scripts": {
     "client": "vite",
     "server": "node server.js",
@@ -12,7 +12,9 @@
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test tests/*.test.js",
+    "test:legacy": "node server_test.js"
   },
   "dependencies": {
     "concurrently": "^10.0.3",
