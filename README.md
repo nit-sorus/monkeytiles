@@ -1,16 +1,120 @@
-# React + Vite
+# Monkeytiles
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Monkeytiles is a browser-based memory card game built with React, Node.js, Express, Socket.IO, and MongoDB. It supports solo play and real-time multiplayer with synchronized turns, scoring, emotes, and player reconnection.
 
-Currently, two official plugins are available:
+**Live demo:** https://monkeytiles.js.org
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Features
 
-## React Compiler
+* Solo and real-time multiplayer gameplay
+* Up to four players per room
+* 4×4, 6×6, and 8×8 boards
+* Multiple card decks
+* Server-authoritative multiplayer logic
+* Temporary and permanent rooms
+* Lifetime scores for permanent rooms (MongoDB)
+* Player reconnection support
+* In-room emoji reactions
+* Responsive desktop and mobile interface
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Tech stack
 
-## Expanding the Oxlint configuration
+| Area     | Technology        |
+| -------- | ----------------- |
+| Frontend | React + Vite      |
+| Backend  | Node.js + Express |
+| Realtime | Socket.IO         |
+| Database | MongoDB           |
+| Styling  | CSS               |
+| Linting  | Oxlint            |
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+## Quick start
+
+### Prerequisites
+
+* Git
+* Node.js (includes npm)
+
+### Installation
+
+```bash
+git clone https://github.com/<your-username>/monkeytiles.git
+cd monkeytiles
+npm ci
+cp .env.example .env
+npm run dev
+```
+
+MongoDB is optional for solo play and temporary rooms.
+
+For full setup instructions, see [docs/development.md](docs/development.md).
+
+## Environment variables
+
+| Variable      | Purpose                                |
+| ------------- | -------------------------------------- |
+| `PORT`        | Backend port (default: `3001`)         |
+| `MONGODB_URI` | MongoDB connection for permanent rooms |
+| `NODE_ENV`    | Runtime environment                    |
+
+Never commit `.env` or database credentials.
+
+## Available commands
+
+| Command               | Purpose                      |
+| --------------------- | ---------------------------- |
+| `npm run dev`         | Start frontend and backend   |
+| `npm run client`      | Start the frontend           |
+| `npm run server`      | Start the backend            |
+| `npm run lint`        | Run Oxlint                   |
+| `npm run build`       | Build the frontend           |
+| `npm run preview`     | Preview the production build |
+| `node server_test.js` | Run the existing test        |
+
+## Architecture
+
+```mermaid
+flowchart TD
+    Client["React client"] <-->|Socket.IO| Server["Node.js server"]
+    Server --> Rooms["Active rooms"]
+    Server --> MongoDB["MongoDB"]
+```
+
+The React client handles the interface, while the Node.js server manages multiplayer rooms, validates gameplay, and synchronizes state between players. MongoDB is used for permanent rooms and lifetime scores.
+
+For a detailed overview, see [docs/architecture.md](docs/architecture.md).
+
+## Project structure
+
+```text
+monkeytiles/
+├── public/              Static assets
+├── src/                 React frontend
+│   ├── App.jsx
+│   ├── main.jsx
+│   └── index.css
+├── docs/                Project documentation
+├── server.js            Backend server
+├── server_test.js       Existing test
+├── package.json
+├── vite.config.js
+└── render.yaml
+```
+
+## Contributing
+
+1. Fork the repository.
+2. Create a feature branch.
+3. Make your changes.
+4. Run the relevant checks.
+5. Open a pull request.
+
+See [docs/development.md](docs/development.md) for the full development workflow.
+
+## Project status
+
+The project is currently being documented, tested, and refactored into a more modular architecture while preserving existing behavior.
+
+## License
+
+No license file is currently included. Confirm licensing with the original project owner before redistributing or reusing the code.
