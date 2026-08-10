@@ -21,6 +21,8 @@ const io = new Server(httpServer, {
 });
 
 const PORT = process.env.PORT || 3001;
+let cleanupInterval = null;
+let isShuttingDown = false;
 
 // Serve static files from the dist directory in production
 app.use(express.static(path.join(__dirname, 'dist')));
@@ -621,6 +623,8 @@ io.on('connection', (socket) => {
   // Disconnect
   socket.on('disconnect', () => {
     console.log(`User disconnected: ${socket.id}`);
+    if (isShuttingDown) return;
+
     const roomId = socket.roomId;
     if (roomId && rooms.has(roomId)) {
       const room = rooms.get(roomId);
@@ -666,22 +670,83 @@ io.on('connection', (socket) => {
   });
 });
 
-// Zombie room cleanup interval (every 1 minute)
-setInterval(() => {
-  const now = Date.now();
-  for (const [roomId, room] of rooms.entries()) {
-    // Exempt M-0314 from cleanup
-    if (roomId === 'M-0314') continue;
-    
-    // If no activity for 10 minutes (600,000 ms)
-    if (now - room.lastActivityAt > 600000) {
-      io.to(roomId).emit('room-closed');
-      rooms.delete(roomId);
-      console.log(`Zombie room deleted due to inactivity: ${roomId}`);
+function startCleanupInterval() {
+  if (cleanupInterval) return;
+
+  // Zombie room cleanup interval (every 1 minute)
+  cleanupInterval = setInterval(() => {
+    const now = Date.now();
+    for (const [roomId, room] of rooms.entries()) {
+      // Exempt M-0314 from cleanup
+      if (roomId === 'M-0314') continue;
+      // If no activity for 10 minutes (600,000 ms)
+      if (now - room.lastActivityAt > 600000) {
+        io.to(roomId).emit('room-closed');
+        rooms.delete(roomId);
+        console.log(`Zombie room deleted due to inactivity: ${roomId}`);
+      }
+    }
+  }, 60000);
+}
+
+export function startServer(port = PORT) {
+  if (httpServer.listening) {
+    return Promise.resolve(httpServer.address());
+  }
+
+  isShuttingDown = false;
+  startCleanupInterval();
+
+  return new Promise((resolve, reject) => {
+    const handleError = (error) => {
+      httpServer.off('listening', handleListening);
+      reject(error);
+    };
+    const handleListening = () => {
+      httpServer.off('error', handleError);
+      const address = httpServer.address();
+      const listeningPort = typeof address === 'object' && address ? address.port : port;
+      console.log(`Server listening on port ${listeningPort}`);
+      resolve(address);
+    };
+
+    httpServer.once('error', handleError);
+    httpServer.once('listening', handleListening);
+    httpServer.listen(port);
+  });
+}
+
+export function stopServer() {
+  isShuttingDown = true;
+
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval);
+    cleanupInterval = null;
+  }
+
+  for (const room of rooms.values()) {
+    for (const player of room.players) {
+      if (player.disconnectTimeout) {
+        clearTimeout(player.disconnectTimeout);
+        player.disconnectTimeout = null;
+      }
     }
   }
-}, 60000);
 
-httpServer.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
-});
+  if (!httpServer.listening) return Promise.resolve();
+
+  return new Promise((resolve) => {
+    io.close(resolve);
+  });
+}
+
+export { app, httpServer, io, rooms };
+
+const isMainModule = process.argv[1] && path.resolve(process.argv[1]) === __filename;
+
+if (isMainModule) {
+  startServer().catch((error) => {
+    console.error('Failed to start server:', error);
+    process.exitCode = 1;
+  });
+}
