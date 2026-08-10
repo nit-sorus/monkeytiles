@@ -142,7 +142,8 @@ Database credentials should never be committed to Git. Store them in an ignored 
 | `npm run lint`        | Run Oxlint                               |
 | `npm run build`       | Build the frontend                       |
 | `npm run preview`     | Preview the production build             |
-| `node server_test.js` | Run the existing mock state-machine test |
+| `npm test`            | Run production server integration tests  |
+| `npm run test:legacy` | Run the legacy mock state-machine test    |
 
 ## Deployment
 
@@ -153,7 +154,8 @@ The frontend is deployed with GitHub Pages, while the backend runs on Render. In
 * `src/App.jsx` mixes UI, local game logic, socket handling, and rendering.
 * `server.js` combines networking, game logic, room management, persistence, and startup.
 * Socket event definitions are duplicated between the client and server.
-* `server_test.js` uses a simplified server instead of the production implementation.
+* Production integration coverage currently exercises only the main two-player happy path.
+* `server_test.js` still exists as a simplified legacy mock test.
 * Some frontend modes and assets appear unused.
 
 These limitations motivate the upcoming refactor. The goal is to improve the project structure without changing existing behavior.

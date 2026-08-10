@@ -77,6 +77,15 @@ Supported environment variables:
 
 Never commit `.env` or database credentials.
 
+The server reads configuration from `process.env` but does not automatically
+load `.env`. In a macOS or Linux shell, export the file before starting it:
+
+```bash
+set -a
+source .env
+set +a
+```
+
 ## Run the project
 
 Start both the frontend and backend:
@@ -105,7 +114,8 @@ Running them in separate terminals is useful when debugging client and server lo
 | `npm run build`       | Build the production frontend into `dist/`  |
 | `npm run preview`     | Preview the production build locally        |
 | `npm run deploy`      | Build and publish `dist/` with GitHub Pages |
-| `node server_test.js` | Run the existing mock state-machine test    |
+| `npm test`            | Run production server integration tests    |
+| `npm run test:legacy` | Run the existing mock state-machine test    |
 
 ## Verification baseline
 
@@ -114,7 +124,8 @@ Before making changes, run:
 ```bash
 npm run lint
 npm run build
-node server_test.js
+npm test
+npm run test:legacy
 npm audit --omit=dev
 git status -sb
 ```
@@ -122,7 +133,7 @@ git status -sb
 Baseline results before the refactoring effort:
 
 * Build completed successfully.
-* The existing mock state-machine test passed.
+* The production integration test and legacy mock test passed.
 * Lint reported three warnings and no errors.
 * The working tree remained clean after installation and build.
 * `npm audit --omit=dev` reported `concurrently` through `shell-quote`.
@@ -135,11 +146,16 @@ Current lint warnings:
 
 These warnings are part of the current baseline and should not automatically be treated as regressions.
 
-## Current test limitation
+## Test coverage
 
-`server_test.js` uses a simplified mock Socket.IO server rather than importing `server.js`.
+`npm test` imports the production `server.js`, starts it on an available port,
+and connects two Socket.IO clients. It verifies room creation, joining, game
+startup, and synchronized card flips.
 
-It verifies basic Socket.IO communication but does not cover production room management, authorization, reconnection, scoring, or MongoDB persistence. Integration tests are planned before the refactor.
+`npm run test:legacy` runs `server_test.js`, which uses a simplified mock
+Socket.IO server. TODO tests record missing coverage for hidden card data,
+host-only controls, and duplicate-player identity handling. Reconnection,
+complete scoring, and MongoDB persistence also need additional coverage.
 
 ## Branch workflow
 

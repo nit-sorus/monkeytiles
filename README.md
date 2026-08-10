@@ -42,10 +42,15 @@ git clone https://github.com/<your-username>/monkeytiles.git
 cd monkeytiles
 npm ci
 cp .env.example .env
+set -a
+source .env
+set +a
 npm run dev
 ```
 
 MongoDB is optional for solo play and temporary rooms.
+The server reads `process.env` but does not automatically load `.env`; the
+`set -a`/`source` commands above export its values in macOS and Linux shells.
 
 For full setup instructions, see [docs/development.md](docs/development.md).
 
@@ -69,7 +74,8 @@ Never commit `.env` or database credentials.
 | `npm run lint`        | Run Oxlint                   |
 | `npm run build`       | Build the frontend           |
 | `npm run preview`     | Preview the production build |
-| `node server_test.js` | Run the existing test        |
+| `npm test`            | Run production server tests  |
+| `npm run test:legacy` | Run the legacy mock test     |
 
 ## Architecture
 
@@ -94,8 +100,9 @@ monkeytiles/
 │   ├── main.jsx
 │   └── index.css
 ├── docs/                Project documentation
+├── tests/               Production integration tests
 ├── server.js            Backend server
-├── server_test.js       Existing test
+├── server_test.js       Legacy mock-server test
 ├── package.json
 ├── vite.config.js
 └── render.yaml
